@@ -12,17 +12,11 @@ export interface ChatResponse {
 }
 
 export interface StreamingData {
-  type: 'session_created' | 'session_continued' | 'token' | 'error' | 'done'
-  content?: string // For token events
-  session_id?: string // For session_created and session_continued events
-  message?: string // For error events
-  usage?: {
-    prompt_tokens?: number
-    completion_tokens?: number
-    total_tokens?: number
-  } // For done events
-  finish_reason?: string // For done events
+  type: 'token' | 'error' | 'done'
+  content?: string
+  session_id?: string
   sources?: string[]
+  detail?: string
 }
 
 export interface ChatModalConfig {

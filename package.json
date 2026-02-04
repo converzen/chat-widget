@@ -4,6 +4,18 @@
   "description": "Drop-in chat widget SDK for ConverZent - Easy to integrate, customizable, and fully featured chat widget",
   "main": "./dist/index.global.js",
   "browser": "./dist/index.global.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.global.js",
+      "require": "./dist/index.global.js",
+      "default": "./dist/index.global.js"
+    },
+    "./markdown": {
+      "import": "./dist/index.global.markdown.js",
+      "require": "./dist/index.global.markdown.js",
+      "default": "./dist/index.global.markdown.js"
+    }
+  },
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
