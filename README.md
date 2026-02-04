@@ -35,7 +35,6 @@ Perfect for static websites or quick integration. Just include the script tag:
   <!-- Initialize -->
   <script>
     GMCWidget.init({
-      chatUrl: "https://chat.converzent.de",
       apiKey: "your-api-key-here",
       headerMsg: "Chat with us",
       initialGreeting: "Hello! How can we help you?",
@@ -71,7 +70,6 @@ Then import and use:
 import { init } from '@converzent/chat-widget';
 
 init({
-  chatUrl: "https://chat.converzent.de",
   apiKey: "your-api-key-here",
   // ... configuration
 });
@@ -83,7 +81,6 @@ Or in TypeScript:
 import { init, WidgetConfig } from '@converzent/chat-widget';
 
 const config: WidgetConfig = {
-  chatUrl: "https://chat.converzent.de",
   apiKey: "your-api-key-here",
   headerMsg: "Chat with us",
   // ... other options
@@ -111,14 +108,18 @@ Then include the built file from `dist/index.global.js` in your project.
 
 ```javascript
 GMCWidget.init({
-  // Required: API endpoint (optional, defaults to https://chat.converzent.de)
+  // Optional: API endpoint (optional, defaults to https://chat.converzent.de)
   chatUrl: "https://chat.converzent.de",
   
   // Authentication: Use either apiKey OR getToken (not both)
   apiKey: "sk_test_...", // For demo/insecure mode
   // OR
   getToken: async () => {
-    // For secure mode - call your backend to get JWT token
+    // For secure mode - keeps the api-key out of the client.
+    // call your backend to get a JWT token
+    // The token can be retrieved from https://chat.converzent.de/api/get_token 
+    // using your api-key. 
+    // Your route should be secured by a login or recaptcha.
     const response = await fetch('/api/get-token');
     const data = await response.json();
     return data.token; // or { token: "...", expiresAt: 1234567890 }
@@ -126,10 +127,10 @@ GMCWidget.init({
   
   // Message persistence
   onSaveMessages: async (messages) => {
-    // Save to your backend
+    // Save to your backend or local storage
   },
   onLoadMessages: async () => {
-    // Load from your backend
+    // Load from your backend or local storage
     return [];
   },
   
@@ -177,7 +178,7 @@ GMCWidget.init({
 
 ### Advanced: Token with Expiration
 
-For better performance, return token expiration:
+For better performance and security, return token expiration:
 
 ```javascript
 getToken: async () => {
