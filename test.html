@@ -13,7 +13,16 @@
       headerMsg: "Chat with an Expert",
       initialGreeting: "Hello! How can we help you today?",
       promptPlaceholder: "Your question...",
-      
+      style: {
+            position: 'bottom-left', // or { bottom: '20px', left: '20px' }
+            dialogSize: 'large', // or { width: 400, height: 600 }
+            frameColor: '#E5E7EB',
+            buttonColor: {
+                normal: '#2563EB',
+                hover: '#1D4ED8',
+                open: '#1F2937'
+            }
+        },
       // Authentication: Use either apiKey OR getToken (not both)
       // - apiKey: Direct API key for insecure/demo mode (uses X-API-Key header)
       // - getToken: Callback that returns token string or { token: string, expiresAt?: number }

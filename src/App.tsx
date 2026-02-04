@@ -1,11 +1,88 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { WidgetConfig } from './index';
+import { WidgetConfig, WidgetStyle } from './index';
 import { ChatMessage } from './types';
 import { streamChatCompletion, streamChatContinuation } from './services/streaming';
 
 // --- Icons ---
 const CHAT_API_URL = 'https://chat.converzent.de';
+
+// --- Style Helper Functions ---
+
+const getPositionStyles = (style?: WidgetStyle): React.CSSProperties => {
+  if (!style?.position) {
+    return { bottom: '1rem', right: '1rem' }; // Default: bottom-right
+  }
+
+  if (typeof style.position === 'string') {
+    // Preset positions
+    switch (style.position) {
+      case 'bottom-right':
+        return { bottom: '1rem', right: '1rem' };
+      case 'bottom-left':
+        return { bottom: '1rem', left: '1rem' };
+      case 'top-right':
+        return { top: '1rem', right: '1rem' };
+      case 'top-left':
+        return { top: '1rem', left: '1rem' };
+      default:
+        return { bottom: '1rem', right: '1rem' };
+    }
+  } else {
+    // Custom position
+    const pos: React.CSSProperties = {};
+    if (style.position.bottom) pos.bottom = style.position.bottom;
+    if (style.position.top) pos.top = style.position.top;
+    if (style.position.left) pos.left = style.position.left;
+    if (style.position.right) pos.right = style.position.right;
+    return pos;
+  }
+};
+
+const getDialogSize = (style?: WidgetStyle): React.CSSProperties => {
+  if (!style?.dialogSize) {
+    return { width: '350px', height: '500px' }; // Default: medium
+  }
+
+  if (typeof style.dialogSize === 'string') {
+    // Preset sizes
+    switch (style.dialogSize) {
+      case 'small':
+        return { width: '300px', height: '400px' };
+      case 'medium':
+        return { width: '350px', height: '500px' };
+      case 'large':
+        return { width: '400px', height: '600px' };
+      default:
+        return { width: '350px', height: '500px' };
+    }
+  } else {
+    // Custom size
+    return {
+      width: `${Math.max(250, style.dialogSize.width)}px`, // Minimum 250px width
+      height: `${Math.max(300, style.dialogSize.height)}px`, // Minimum 300px height
+    };
+  }
+};
+
+const getFrameColor = (style?: WidgetStyle): string => {
+  return style?.frameColor || '#E5E7EB'; // Default: gray-200
+};
+
+const getButtonColors = (style?: WidgetStyle, isOpen?: boolean): React.CSSProperties => {
+  const colors = style?.buttonColor;
+  
+  if (isOpen) {
+    return {
+      backgroundColor: colors?.open || '#1F2937', // Default: gray-800
+    };
+  }
+  
+  return {
+    backgroundColor: colors?.normal || '#2563EB', // Default: blue-600
+    '--hover-color': colors?.hover || '#1D4ED8', // Default: blue-700
+  } as React.CSSProperties;
+};
 
 const ChatIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="cvz-w-6 cvz-h-6">
@@ -518,18 +595,46 @@ const App: React.FC<AppProps> = ({ config }) => {
     }
   };
 
+  // Compute styles from config
+  const positionStyles = getPositionStyles(config.style);
+  const dialogSizeStyles = getDialogSize(config.style);
+  const frameColor = getFrameColor(config.style);
+  const buttonColors = getButtonColors(config.style, isOpen);
+
+  // Determine dialog position relative to button based on main position
+  const isBottomPosition = !config.style?.position || 
+    (typeof config.style.position === 'string' && (config.style.position === 'bottom-right' || config.style.position === 'bottom-left')) ||
+    (typeof config.style.position === 'object' && config.style.position.bottom);
+  
+  const isRightPosition = !config.style?.position || 
+    (typeof config.style.position === 'string' && (config.style.position === 'bottom-right' || config.style.position === 'top-right')) ||
+    (typeof config.style.position === 'object' && config.style.position.right);
+
   return (
-    <div className="cvz-fixed cvz-bottom-4 cvz-right-4 cvz-z-[9999] cvz-font-sans">
+    <div 
+      className="cvz-fixed cvz-z-[9999] cvz-font-sans"
+      style={positionStyles}
+    >
       {/* Chat Window Container with Transition Logic */}
       <div 
         className={`
-          cvz-absolute cvz-bottom-20 cvz-right-0 cvz-w-[350px] cvz-h-[500px] 
-          cvz-bg-white cvz-rounded-2xl cvz-shadow-2xl cvz-flex cvz-flex-col cvz-overflow-hidden cvz-border cvz-border-gray-200
-          cvz-transition-all cvz-duration-300 cvz-origin-bottom-right
+          cvz-absolute cvz-bg-white cvz-rounded-2xl cvz-shadow-2xl cvz-flex cvz-flex-col cvz-overflow-hidden
+          cvz-transition-all cvz-duration-300
+          ${isBottomPosition ? 'cvz-bottom-20' : 'cvz-top-20'}
+          ${isRightPosition ? 'cvz-right-0' : 'cvz-left-0'}
+          ${isBottomPosition && isRightPosition ? 'cvz-origin-bottom-right' : 
+            isBottomPosition && !isRightPosition ? 'cvz-origin-bottom-left' :
+            !isBottomPosition && isRightPosition ? 'cvz-origin-top-right' : 'cvz-origin-top-left'}
           ${isOpen 
             ? 'cvz-opacity-100 cvz-scale-100 cvz-translate-y-0' 
             : 'cvz-opacity-0 cvz-scale-95 cvz-translate-y-4 cvz-pointer-events-none'}
         `}
+        style={{
+          ...dialogSizeStyles,
+          borderColor: frameColor,
+          borderWidth: '1px',
+          borderStyle: 'solid',
+        }}
       >
         <ChatHeader 
           title={config.headerMsg || 'Support Chat'} 
@@ -560,8 +665,21 @@ const App: React.FC<AppProps> = ({ config }) => {
         className={`
           cvz-flex cvz-items-center cvz-justify-center
           cvz-w-14 cvz-h-14 cvz-rounded-full cvz-shadow-lg cvz-transition-all cvz-duration-300
-          ${isOpen ? 'cvz-bg-gray-800 cvz-rotate-90' : 'cvz-bg-blue-600 cvz-hover:cvz-bg-blue-700 cvz-hover:cvz-scale-105'}
+          ${isOpen ? 'cvz-rotate-90' : 'cvz-hover:cvz-scale-105'}
         `}
+        style={{
+          backgroundColor: buttonColors.backgroundColor,
+        }}
+        onMouseEnter={(e) => {
+          if (!isOpen && config.style?.buttonColor?.hover) {
+            e.currentTarget.style.backgroundColor = config.style.buttonColor.hover;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isOpen) {
+            e.currentTarget.style.backgroundColor = buttonColors.backgroundColor as string;
+          }
+        }}
       >
         <div className="cvz-text-white">
           {isOpen ? <XMarkIcon /> : <ChatIcon />}
