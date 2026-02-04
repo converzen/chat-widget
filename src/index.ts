@@ -2,15 +2,19 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import styles from './styles/output.css';
+import {ChatMessage} from "@/types";
 
 export interface WidgetConfig {
-  getToken: () => Promise<string>;
-  onSaveMessages: (messages: any[]) => Promise<void>;
-  onLoadMessages: () => Promise<any[]>;
+  apiKey?: string,
+  getToken?: () => Promise<string>;
+  onSaveMessages: (messages: ChatMessage[]) => Promise<void>;
+  onLoadMessages: () => Promise<ChatMessage[]>;
   headerMsg?: string;
   initialGreeting?: string;
   promptPlaceholder?: string;
-  chatUrl?: string;
+  chatUrl: string; // Required for streaming
+  persona?: string; // Optional persona identifier
+  authType?: 'apiKey' | 'bearer'; // Authentication method, defaults to 'bearer'
 }
 
 let isInitialized = false;

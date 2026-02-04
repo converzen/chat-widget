@@ -3,14 +3,19 @@
   <script src="./dist/index.global.js"></script>
   <script>
     GMCWidget.init({
+      // Required configuration
+      // chatUrl: "https://api.example.com", // Replace with your actual chat API URL
+      apiKey: "sk_test_dwzR2yDj35AGcgHbw9cpaBRgb9qEkvFE",
       // Customization
       headerMsg: "Chat with an Expert",
       initialGreeting: "Hello! How can we help you today?",
       promptPlaceholder: "Your question...",
-
+      
+      // Authentication (optional - defaults to 'bearer')
+      authType: "bearer", // or "apiKey" for direct API key usage
 
       // Callbacks
-      getToken: async () => "mock-jwt-token",
+      getToken: async () => "mock-jwt-token", // Returns JWT token or API key based on authType
       onSaveMessages: async (m) => console.log("Saving:", m),
       onLoadMessages: async () => {
         console.log("Loading messages...");
