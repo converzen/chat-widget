@@ -9,11 +9,6 @@ export interface TokenResponse {
   expiresAt?: number; // Unix timestamp in milliseconds, optional
 }
 
-export interface TokenResponse {
-  token: string;
-  expiresAt?: number; // Unix timestamp in milliseconds, optional
-}
-
 export interface WidgetConfig {
   apiKey?: string; // Direct API key (for insecure/demo mode) - uses X-API-Key header
   getToken?: () => Promise<string | TokenResponse>; // Returns token string or TokenResponse with expiration
@@ -22,8 +17,9 @@ export interface WidgetConfig {
   headerMsg?: string;
   initialGreeting?: string;
   promptPlaceholder?: string;
-  chatUrl?: string; // optional
+  chatUrl?: string; // Optional - defaults to 'https://chat.converzent.de'
   persona?: string; // Optional persona identifier
+  sessionId?: string; // Optional session ID to continue an existing conversation
 }
 
 let isInitialized = false;

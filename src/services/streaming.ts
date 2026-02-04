@@ -146,7 +146,7 @@ export async function* streamChatCompletion(
     
     yield {
       type: 'error',
-      message: errorMessage,
+      message: `${response.status} ${errorMessage}`, // Include status code for error detection
     };
     return;
   }
@@ -214,7 +214,7 @@ export async function* streamChatContinuation(
     
     yield {
       type: 'error',
-      message: errorMessage,
+      message: `${response.status} ${errorMessage}`, // Include status code for error detection
     };
     return;
   }

@@ -236,10 +236,15 @@ const App: React.FC<AppProps> = ({ config }) => {
 
         setMessages(initialMessages);
         
-        // Try to restore session ID from localStorage
-        const savedSessionId = localStorage.getItem('cvz-widget-session-id');
-        if (savedSessionId) {
-          setSessionId(savedSessionId);
+        // Restore session ID: priority: config.sessionId > localStorage > null
+        if (config.sessionId) {
+          setSessionId(config.sessionId);
+          localStorage.setItem('cvz-widget-session-id', config.sessionId);
+        } else {
+          const savedSessionId = localStorage.getItem('cvz-widget-session-id');
+          if (savedSessionId) {
+            setSessionId(savedSessionId);
+          }
         }
       } catch (error) {
         console.error('Failed to load messages:', error);
@@ -249,80 +254,61 @@ const App: React.FC<AppProps> = ({ config }) => {
   }, [config]);
 
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!inputValue.trim() || isStreaming) return;
-
-    // Cancel any existing stream
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+  // Helper function to get auth token with caching
+  const getAuthToken = async (forceRefresh = false): Promise<{ token: string; type: 'apiKey' | 'bearer' }> => {
+    if (config.apiKey) {
+      return { token: config.apiKey, type: 'apiKey' };
+    }
+    
+    if (!config.getToken) {
+      throw new Error('Either apiKey or getToken must be provided');
     }
 
-    const userMessage: ChatMessage = {
-      content: inputValue.trim(),
-      role: 'USER',
-      createdAt: new Date().toISOString(),
-    };
+    // Check token cache first (unless forcing refresh)
+    if (!forceRefresh) {
+      const now = Date.now();
+      const cached = tokenCacheRef.current;
+      const isTokenValid = cached && (
+        cached.expiresAt === null || // No expiration - always valid
+        cached.expiresAt > now // Has expiration and not expired
+      );
+      
+      if (isTokenValid) {
+        return { token: cached.token, type: 'bearer' };
+      }
+    }
 
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-    setInputValue('');
-    setIsLoading(true);
-    setIsStreaming(true);
-    setStreamingMessage('');
+    // Fetch new token
+    const tokenResult = await config.getToken();
+    
+    if (typeof tokenResult === 'string') {
+      // Simple string token - no expiration, cache it
+      tokenCacheRef.current = { token: tokenResult, expiresAt: null };
+      return { token: tokenResult, type: 'bearer' };
+    } else {
+      // TokenResponse with expiration
+      const expiresAt = tokenResult.expiresAt || null;
+      tokenCacheRef.current = { token: tokenResult.token, expiresAt };
+      return { token: tokenResult.token, type: 'bearer' };
+    }
+  };
 
+  // Helper function to execute streaming with retry on auth errors
+  const executeStreaming = async (
+    userMessage: ChatMessage,
+    updatedMessages: ChatMessage[],
+    abortController: AbortController,
+    retryCount = 0
+  ): Promise<void> => {
+    const maxRetries = 1; // Only retry once for token refresh
+    
     try {
       // Get authentication token/key
-      let authToken: string;
-      let authType: 'apiKey' | 'bearer';
+      const auth = await getAuthToken(retryCount > 0); // Force refresh on retry
+      const baseUrl = config.chatUrl || CHAT_API_URL; // Defaults to 'https://chat.converzent.de'
       
-      if (config.apiKey) {
-        // Use direct API key - always use apiKey auth type
-        authToken = config.apiKey;
-        authType = 'apiKey';
-      } else if (config.getToken) {
-        // Check token cache first
-        const now = Date.now();
-        const cached = tokenCacheRef.current;
-        const isTokenValid = cached && (
-          cached.expiresAt === null || // No expiration - always valid
-          cached.expiresAt > now // Has expiration and not expired
-        );
-        
-        if (isTokenValid) {
-          // Use cached token
-          authToken = cached.token;
-        } else {
-          // Fetch new token
-          const tokenResult = await config.getToken();
-          
-          if (typeof tokenResult === 'string') {
-            // Simple string token - no expiration, cache it
-            authToken = tokenResult;
-            tokenCacheRef.current = { token: authToken, expiresAt: null };
-          } else {
-            // TokenResponse with expiration
-            authToken = tokenResult.token;
-            const expiresAt = tokenResult.expiresAt || null;
-            tokenCacheRef.current = { token: authToken, expiresAt };
-          }
-        }
-        authType = 'bearer';
-      } else {
-        throw new Error('Either apiKey or getToken must be provided');
-      }
-
-      // Create new abort controller for this request
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
-
       // Determine which endpoint to use based on sessionId
       const useCompletion = !sessionId;
-      const baseUrl = config.chatUrl || CHAT_API_URL;
-      
-      if (!baseUrl) {
-        throw new Error('chatUrl is required');
-      }
       
       let streamGenerator;
       if (useCompletion) {
@@ -330,23 +316,24 @@ const App: React.FC<AppProps> = ({ config }) => {
           baseUrl,
           message: userMessage.content,
           persona: config.persona,
-          authToken,
-          authType,
+          authToken: auth.token,
+          authType: auth.type,
           abortSignal: abortController.signal,
         });
       } else {
         streamGenerator = streamChatContinuation({
           baseUrl,
-          sessionId,
+          sessionId: sessionId!,
           message: userMessage.content,
-          authToken,
-          authType,
+          authToken: auth.token,
+          authType: auth.type,
           abortSignal: abortController.signal,
         });
       }
 
       // Process stream events
       let accumulatedContent = '';
+      let hasUnauthorizedError = false;
       
       for await (const event of streamGenerator) {
         // Check if stream was aborted
@@ -392,10 +379,23 @@ const App: React.FC<AppProps> = ({ config }) => {
             return;
 
           case 'error':
-            console.error('Stream error:', event.message);
+            // Check if it's an unauthorized error (401 or 403)
+            const errorMsg = event.message || '';
+            if ((errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('Unauthorized') || errorMsg.includes('Forbidden')) && 
+                retryCount < maxRetries && 
+                config.getToken && 
+                !config.apiKey) {
+              // Clear token cache and retry once
+              console.log('Unauthorized error detected, refreshing token and retrying...');
+              tokenCacheRef.current = null;
+              hasUnauthorizedError = true;
+              break; // Exit the loop to retry
+            }
+            
             // Show error message to user
+            console.error('Stream error:', errorMsg);
             const errorMessage: ChatMessage = {
-              content: `Error: ${event.message || 'An error occurred'}`,
+              content: `Error: ${errorMsg || 'An error occurred'}`,
               role: 'SYSTEM',
               createdAt: new Date().toISOString(),
             };
@@ -410,14 +410,66 @@ const App: React.FC<AppProps> = ({ config }) => {
         }
       }
 
+      // If we got an unauthorized error, retry once
+      if (hasUnauthorizedError && retryCount < maxRetries) {
+        return executeStreaming(userMessage, updatedMessages, abortController, retryCount + 1);
+      }
+
       // If we exit the loop without a 'done' event, something went wrong
-      if (!abortController.signal.aborted) {
+      if (!abortController.signal.aborted && !hasUnauthorizedError) {
         console.error('Stream ended unexpectedly');
         setStreamingMessage('');
         setIsStreaming(false);
         setIsLoading(false);
         abortControllerRef.current = null;
       }
+
+    } catch (error) {
+      // Check if it's an unauthorized error from fetch
+      if (error instanceof Error && 
+          (error.message.includes('401') || error.message.includes('403')) &&
+          retryCount < maxRetries && 
+          config.getToken && 
+          !config.apiKey) {
+        // Clear token cache and retry once
+        console.log('Unauthorized error detected, refreshing token and retrying...');
+        tokenCacheRef.current = null;
+        return executeStreaming(userMessage, updatedMessages, abortController, retryCount + 1);
+      }
+      
+      throw error; // Re-throw if not a retryable auth error
+    }
+  };
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!inputValue.trim() || isStreaming) return;
+
+    // Cancel any existing stream
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const userMessage: ChatMessage = {
+      content: inputValue.trim(),
+      role: 'USER',
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setInputValue('');
+    setIsLoading(true);
+    setIsStreaming(true);
+    setStreamingMessage('');
+
+    try {
+      // Create new abort controller for this request
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
+      // Execute streaming with retry logic
+      await executeStreaming(userMessage, updatedMessages, abortController);
 
     } catch (error) {
       console.error('Error sending message:', error);
