@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* You can add widget-specific resets here since 
+   Tailwind's 'base' might be too aggressive for a shadow root */
+:host {
+  all: initial; /* Reset inherited styles from the host site */
+  font-family: sans-serif;
+}
