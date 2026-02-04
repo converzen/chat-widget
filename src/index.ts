@@ -1,12 +1,16 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import styles from './styles/global.css';
+import styles from './styles/output.css';
 
 export interface WidgetConfig {
   getToken: () => Promise<string>;
   onSaveMessages: (messages: any[]) => Promise<void>;
   onLoadMessages: () => Promise<any[]>;
+  headerMsg?: string;
+  initialGreeting?: string;
+  promptPlaceholder?: string;
+  chatUrl?: string;
 }
 
 let isInitialized = false;
@@ -16,6 +20,9 @@ export function init(config: WidgetConfig) {
     console.warn('GMCWidget is already initialized.');
     return;
   }
+
+  console.log('Initializing GMCWidget...');
+  console.log('CSS Length:', styles.length); // Debug log
 
   // Create the host element
   const hostElement = document.createElement('div');

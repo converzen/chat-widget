@@ -8,16 +8,11 @@ export default defineConfig({
   minify: true,
   bundle: true,
   dts: true,
-  // We exclude nothing - everything must be in the one .js file
   noExternal: [/(.*)/], 
   platform: 'browser',
-  esbuildOptions(options) {
-    // This allows us to import .css files as text strings
-    options.loader = {
-      '.css': 'text',
-    };
+  loader: {
+    '.css': 'text',
   },
-  // Optional: Run tailwind build before tsup bundles
   async onSuccess() {
     console.log('Build successful!');
   }

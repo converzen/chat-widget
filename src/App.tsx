@@ -43,14 +43,26 @@ const App: React.FC<AppProps> = ({ config }) => {
     const loadHistory = async () => {
       try {
         const history = await config.onLoadMessages();
-        if (Array.isArray(history)) {
-          setMessages(history);
+        let initialMessages: Message[] = [];
+
+        if (Array.isArray(history) && history.length > 0) {
+          initialMessages = history;
+        } else if (config.initialGreeting) {
+          // Add initial greeting if history is empty
+          initialMessages = [{
+            id: 'init-greeting',
+            text: config.initialGreeting || 'Hello! How can we help you today?',
+            sender: 'agent',
+            timestamp: Date.now(),
+          }];
         }
+
+        setMessages(initialMessages);
       } catch (error) {
         console.error('Failed to load messages:', error);
       }
     };
-    loadHistory();
+      loadHistory();
   }, [config]);
 
   // Scroll to bottom when messages change
@@ -108,7 +120,13 @@ const App: React.FC<AppProps> = ({ config }) => {
         <div className="cvz-absolute cvz-bottom-16 cvz-right-0 cvz-w-80 cvz-h-96 cvz-bg-white cvz-rounded-lg cvz-shadow-xl cvz-flex cvz-flex-col cvz-overflow-hidden cvz-border cvz-border-gray-200">
           {/* Header */}
           <div className="cvz-bg-blue-600 cvz-text-white cvz-p-4 cvz-flex cvz-justify-between cvz-items-center">
-            <h3 className="cvz-font-bold">Support Chat</h3>
+            <div className="cvz-flex cvz-items-center cvz-gap-2">
+              <div className="cvz-relative">
+                <div className="cvz-w-2 cvz-h-2 cvz-bg-green-400 cvz-rounded-full"></div>
+                <div className="cvz-absolute cvz-top-0 cvz-left-0 cvz-w-2 cvz-h-2 cvz-bg-green-400 cvz-rounded-full cvz-animate-ping"></div>
+              </div>
+              <h3 className="cvz-font-bold">{config.headerMsg || 'Support Chat'}</h3>
+            </div>
             <button 
               onClick={() => setIsOpen(false)}
               className="cvz-text-white cvz-hover:cvz-text-gray-200 cvz-transition-colors"
@@ -156,7 +174,7 @@ const App: React.FC<AppProps> = ({ config }) => {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Type a message..."
+              placeholder={config.promptPlaceholder || "Type a message..."}
               className="cvz-flex-1 cvz-border cvz-border-gray-300 cvz-rounded-md cvz-px-3 cvz-py-2 cvz-text-sm cvz-focus:cvz-outline-none cvz-focus:cvz-border-blue-500"
             />
             <button

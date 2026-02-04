@@ -3,11 +3,18 @@
   <script src="./dist/index.global.js"></script>
   <script>
     GMCWidget.init({
+      // Customization
+      headerMsg: "Chat with an Expert",
+      initialGreeting: "Hello! How can we help you today?",
+      promptPlaceholder: "Your question...",
+
+
+      // Callbacks
       getToken: async () => "mock-jwt-token",
       onSaveMessages: async (m) => console.log("Saving:", m),
       onLoadMessages: async () => {
         console.log("Loading messages...");
-        return []; // Return empty array or mock history
+        return []; // Return empty array to see the initialGreeting
       }
     });
   </script>

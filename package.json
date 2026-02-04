@@ -9,8 +9,8 @@
     "dist"
   ],
   "scripts": {
-    "dev": "tsup --watch",
-    "build": "tsup",
+    "dev": "npm run build && (tailwindcss -i ./src/styles/global.css -o ./src/styles/output.css --watch & tsup --watch)",
+    "build": "tailwindcss -i ./src/styles/global.css -o ./src/styles/output.css && tsup",
     "lint": "eslint src"
   },
   "author": "",
