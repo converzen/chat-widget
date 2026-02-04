@@ -1,10 +1,14 @@
 <body>
   <h1>My Client Site</h1>
-  <script src="./dist/index.js"></script>
+  <script src="./dist/index.global.js"></script>
   <script>
     GMCWidget.init({
       getToken: async () => "mock-jwt-token",
-      onSaveMessages: async (m) => console.log("Saving:", m)
+      onSaveMessages: async (m) => console.log("Saving:", m),
+      onLoadMessages: async () => {
+        console.log("Loading messages...");
+        return []; // Return empty array or mock history
+      }
     });
   </script>
 </body>
