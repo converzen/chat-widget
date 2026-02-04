@@ -1,6 +1,10 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-/dist/
+# Build output - keep dist/ for CDN, but ignore in git
+# dist/ is included in npm package via package.json "files" field
+# Uncomment the line below if you want to exclude dist from git
+# /dist/
+
 /.idea/
 /src/old/
 # dependencies

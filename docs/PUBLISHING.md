@@ -1,0 +1,212 @@
+# Publishing Guide
+
+This guide explains how to publish the ConverZent Chat Widget to npm, GitHub, and CDN.
+
+## Prerequisites
+
+1. **npm account**: Create an account at [npmjs.com](https://www.npmjs.com/)
+2. **GitHub repository**: Create a repository (e.g., `converzent/chat-widget`)
+3. **CDN hosting**: Set up CDN or static file hosting
+
+## 1. NPM Publishing
+
+### Initial Setup
+
+1. **Login to npm**:
+   ```bash
+   npm login
+   ```
+
+2. **Verify package name is available**:
+   ```bash
+   npm view @converzent/chat-widget
+   ```
+   If it returns 404, the name is available.
+
+3. **Update version** (if needed):
+   ```bash
+   npm version patch  # 1.0.0 -> 1.0.1
+   npm version minor  # 1.0.0 -> 1.1.0
+   npm version major  # 1.0.0 -> 2.0.0
+   ```
+
+### Publishing
+
+1. **Build the package**:
+   ```bash
+   npm run build
+   ```
+
+2. **Publish to npm**:
+   ```bash
+   npm publish --access public
+   ```
+   (The `--access public` flag is required for scoped packages like `@converzent/...`)
+
+3. **Verify publication**:
+   ```bash
+   npm view @converzent/chat-widget
+   ```
+
+### Updating
+
+For subsequent releases:
+
+```bash
+# Update version
+npm version patch
+
+# Build
+npm run build
+
+# Publish
+npm publish --access public
+```
+
+### Using npm CDN
+
+Once published, users can use via npm CDNs:
+
+```html
+<!-- unpkg -->
+<script src="https://unpkg.com/@converzent/chat-widget@latest/dist/index.global.js"></script>
+
+<!-- jsDelivr -->
+<script src="https://cdn.jsdelivr.net/npm/@converzent/chat-widget@latest/dist/index.global.js"></script>
+```
+
+## 2. GitHub Repository
+
+### Initial Setup
+
+1. **Create repository** on GitHub (e.g., `converzent/chat-widget`)
+
+2. **Update package.json** (already done):
+   ```json
+   {
+     "repository": {
+       "type": "git",
+       "url": "https://github.com/converzent/chat-widget.git"
+     }
+   }
+   ```
+
+3. **Push to GitHub**:
+   ```bash
+   git remote add origin https://github.com/converzent/chat-widget.git
+   git branch -M main
+   git push -u origin main
+   ```
+
+### GitHub Releases
+
+1. **Create a release**:
+   - Go to GitHub repository → Releases → "Create a new release"
+   - Tag: `v1.0.0` (match package.json version)
+   - Title: `v1.0.0`
+   - Description: Release notes
+
+2. **Upload build artifacts** (optional):
+   - Upload `dist/index.global.js` as a release asset
+   - Users can download directly or use via jsDelivr
+
+### Using GitHub CDN (jsDelivr)
+
+If you upload `dist/index.global.js` to releases:
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@v1.0.0/dist/index.global.js"></script>
+```
+
+Or from main branch:
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@main/dist/index.global.js"></script>
+```
+
+## 3. CDN Hosting
+
+### Option A: Your Own CDN
+
+1. **Build the widget**:
+   ```bash
+   npm run build
+   ```
+
+2. **Upload to CDN**:
+   - Upload `dist/index.global.js` to your CDN
+   - Organize by version: `/chat-widget/1.0.0/index.global.js`
+   - Create symlink for `latest`: `/chat-widget/latest/index.global.js`
+
+3. **Configure CDN**:
+   - Set proper cache headers
+   - Enable compression (gzip/brotli)
+   - Enable CORS if needed
+
+### Option B: GitHub Pages
+
+1. **Enable GitHub Pages** in repository settings
+
+2. **Create `docs` folder**:
+   ```bash
+   mkdir docs
+   cp dist/index.global.js docs/
+   ```
+
+3. **Commit and push**:
+   ```bash
+   git add docs/
+   git commit -m "Add CDN build"
+   git push
+   ```
+
+4. **Users can access**:
+   ```html
+   <script src="https://converzent.github.io/chat-widget/index.global.js"></script>
+   ```
+
+## Version Management
+
+### Semantic Versioning
+
+Follow [semver](https://semver.org/):
+- **MAJOR**: Breaking changes
+- **MINOR**: New features (backward compatible)
+- **PATCH**: Bug fixes (backward compatible)
+
+### Versioning Strategy
+
+- **npm**: Use `npm version` command
+- **GitHub**: Tag releases with `v1.0.0` format
+- **CDN**: Organize files by version number
+
+## Checklist Before Publishing
+
+- [ ] Update version in `package.json`
+- [ ] Update `README.md` with latest features
+- [ ] Run `npm run build` successfully
+- [ ] Test the built file locally (`test.html`)
+- [ ] Verify all configuration options are documented
+- [ ] Check that `.npmignore` excludes unnecessary files
+- [ ] Ensure `dist/` contains all necessary files
+
+## Post-Publishing
+
+1. **Update documentation** with CDN URLs
+2. **Create release notes** on GitHub
+3. **Announce** on your website/docs
+4. **Monitor** for issues/feedback
+
+## Troubleshooting
+
+### npm: "Package name already exists"
+- Choose a different name, or
+- Use a scoped package: `@converzent/chat-widget`
+
+### npm: "You do not have permission"
+- Ensure you're logged in: `npm whoami`
+- For scoped packages, use `--access public`
+
+### CDN: CORS errors
+- Enable CORS headers on your CDN
+- Or use npm CDN (unpkg/jsDelivr) which handles CORS

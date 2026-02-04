@@ -1,0 +1,34 @@
+# Source files
+src/
+*.ts
+*.tsx
+!*.d.ts
+
+# Development files
+test.html
+openapi.json
+tsconfig.json
+tsup.config.ts
+tailwind.config.js
+postcss.config.js
+
+# Build artifacts (keep dist/)
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Misc
+.DS_Store
+*.log
+.env*

@@ -1,20 +1,39 @@
 {
   "name": "@converzent/chat-widget",
   "version": "1.0.0",
-  "description": "Drop-in chat widget SDK",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "description": "Drop-in chat widget SDK for ConverZent - Easy to integrate, customizable, and fully featured chat widget",
+  "main": "./dist/index.global.js",
+  "browser": "./dist/index.global.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "dev": "npm run build && (tailwindcss -i ./src/styles/global.css -o ./src/styles/output.css --watch & tsup --watch)",
     "build": "tailwindcss -i ./src/styles/global.css -o ./src/styles/output.css && tsup",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "prepublishOnly": "npm run build"
   },
-  "author": "",
+  "keywords": [
+    "chat",
+    "widget",
+    "chatbot",
+    "converzent",
+    "sdk",
+    "react",
+    "typescript"
+  ],
+  "author": "ConverZent",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/converzent/chat-widget.git"
+  },
+  "bugs": {
+    "url": "https://github.com/converzent/chat-widget/issues"
+  },
+  "homepage": "https://github.com/converzent/chat-widget#readme",
   "devDependencies": {
     "@headlessui/react": "^1.7.0",
     "@heroicons/react": "^2.0.0",

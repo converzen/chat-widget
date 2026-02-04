@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ConverZent Chat Widget - CDN Example</title>
+</head>
+<body>
+  <h1>My Website</h1>
+  <p>This is an example of using the ConverZent Chat Widget via CDN.</p>
+  
+  <!-- Include the widget from CDN -->
+  <!-- Replace with your actual CDN URL -->
+  <script src="https://cdn.converzent.de/chat-widget/latest/index.global.js"></script>
+  
+  <!-- Initialize the widget -->
+  <script>
+    GMCWidget.init({
+      // API endpoint (optional, defaults to https://chat.converzent.de)
+      chatUrl: "https://chat.converzent.de",
+      
+      // Authentication: Use API key for demo mode
+      apiKey: "your-api-key-here",
+      
+      // OR use getToken for secure mode:
+      // getToken: async () => {
+      //   const response = await fetch('/api/get-token');
+      //   const data = await response.json();
+      //   return data.token;
+      // },
+      
+      // UI Customization
+      headerMsg: "Chat with us",
+      initialGreeting: "Hello! How can we help you today?",
+      promptPlaceholder: "Type your message...",
+      
+      // Optional: Styling
+      style: {
+        position: 'bottom-right',
+        dialogSize: 'medium',
+        frameColor: '#E5E7EB',
+        buttonColor: {
+          normal: '#2563EB',
+          hover: '#1D4ED8',
+          open: '#1F2937'
+        }
+      },
+      
+      // Message persistence callbacks
+      onSaveMessages: async (messages) => {
+        // Save messages to your backend
+        console.log('Saving messages:', messages);
+        // Example:
+        // await fetch('/api/messages', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify(messages)
+        // });
+      },
+      
+      onLoadMessages: async () => {
+        // Load messages from your backend
+        console.log('Loading messages...');
+        // Example:
+        // const response = await fetch('/api/messages');
+        // return response.json();
+        return [];
+      }
+    });
+  </script>
+</body>
+</html>
