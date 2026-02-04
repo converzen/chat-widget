@@ -1,0 +1,10 @@
+<body>
+  <h1>My Client Site</h1>
+  <script src="./dist/index.js"></script>
+  <script>
+    GMCWidget.init({
+      getToken: async () => "mock-jwt-token",
+      onSaveMessages: async (m) => console.log("Saving:", m)
+    });
+  </script>
+</body>

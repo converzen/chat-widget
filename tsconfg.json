@@ -4,15 +4,16 @@
     "module": "ESNext",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "jsx": "react-jsx",
-    "moduleResolution": "node",
-    "strict": true,
-    "declaration": true,
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
+    "strict": true,
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "src/declarations.d.ts"]
 }
+
