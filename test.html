@@ -4,18 +4,21 @@
   <script>
     GMCWidget.init({
       // Required configuration
-      // chatUrl: "https://api.example.com", // Replace with your actual chat API URL
+      chatUrl: "https://chat.converzent.de", // Replace with your actual chat API URL
+      
+      // API Key (for insecure/demo mode)
       apiKey: "sk_test_dwzR2yDj35AGcgHbw9cpaBRgb9qEkvFE",
+      persona: { "version_type": "next", "persona_id": 1 },
       // Customization
       headerMsg: "Chat with an Expert",
       initialGreeting: "Hello! How can we help you today?",
       promptPlaceholder: "Your question...",
       
-      // Authentication (optional - defaults to 'bearer')
-      authType: "bearer", // or "apiKey" for direct API key usage
-
-      // Callbacks
-      getToken: async () => "mock-jwt-token", // Returns JWT token or API key based on authType
+      // Authentication: Use either apiKey OR getToken (not both)
+      // - apiKey: Direct API key for insecure/demo mode (uses X-API-Key header)
+      // - getToken: Callback that returns token string or { token: string, expiresAt?: number }
+      //   getToken: async () => "mock-jwt-token", // Simple string token
+      //   getToken: async () => ({ token: "mock-jwt-token", expiresAt: Date.now() + 3600000 }), // With expiration
       onSaveMessages: async (m) => console.log("Saving:", m),
       onLoadMessages: async () => {
         console.log("Loading messages...");

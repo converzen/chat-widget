@@ -215,6 +215,7 @@ const App: React.FC<AppProps> = ({ config }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const tokenCacheRef = useRef<{ token: string; expiresAt: number | null } | null>(null);
 
   // Load messages and session ID on mount
   useEffect(() => {
@@ -261,7 +262,7 @@ const App: React.FC<AppProps> = ({ config }) => {
       content: inputValue.trim(),
       role: 'USER',
       createdAt: new Date().toISOString(),
-    };sk_test_dwzR2yDj35AGcgHbw9cpaBRgb9qEkvFE
+    };
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
@@ -272,29 +273,61 @@ const App: React.FC<AppProps> = ({ config }) => {
 
     try {
       // Get authentication token/key
-        let authType: 'apiKey' | 'bearer' | undefined;
-        let authToken: string = '';
-        if (config.apiKey) {
-            authType = 'apiKey'
-            authToken = config.apiKey
-        } else if (config.getToken) {
-            authType = 'bearer';
-            authToken = await config.getToken();
+      let authToken: string;
+      let authType: 'apiKey' | 'bearer';
+      
+      if (config.apiKey) {
+        // Use direct API key - always use apiKey auth type
+        authToken = config.apiKey;
+        authType = 'apiKey';
+      } else if (config.getToken) {
+        // Check token cache first
+        const now = Date.now();
+        const cached = tokenCacheRef.current;
+        const isTokenValid = cached && (
+          cached.expiresAt === null || // No expiration - always valid
+          cached.expiresAt > now // Has expiration and not expired
+        );
+        
+        if (isTokenValid) {
+          // Use cached token
+          authToken = cached.token;
         } else {
-            throw new Error("no auth type selected")
+          // Fetch new token
+          const tokenResult = await config.getToken();
+          
+          if (typeof tokenResult === 'string') {
+            // Simple string token - no expiration, cache it
+            authToken = tokenResult;
+            tokenCacheRef.current = { token: authToken, expiresAt: null };
+          } else {
+            // TokenResponse with expiration
+            authToken = tokenResult.token;
+            const expiresAt = tokenResult.expiresAt || null;
+            tokenCacheRef.current = { token: authToken, expiresAt };
+          }
         }
+        authType = 'bearer';
+      } else {
+        throw new Error('Either apiKey or getToken must be provided');
+      }
 
-        // Create new abort controller for this request
+      // Create new abort controller for this request
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
       // Determine which endpoint to use based on sessionId
       const useCompletion = !sessionId;
+      const baseUrl = config.chatUrl || CHAT_API_URL;
+      
+      if (!baseUrl) {
+        throw new Error('chatUrl is required');
+      }
       
       let streamGenerator;
       if (useCompletion) {
         streamGenerator = streamChatCompletion({
-          baseUrl: config.chatUrl || CHAT_API_URL,
+          baseUrl,
           message: userMessage.content,
           persona: config.persona,
           authToken,
@@ -303,7 +336,7 @@ const App: React.FC<AppProps> = ({ config }) => {
         });
       } else {
         streamGenerator = streamChatContinuation({
-          baseUrl: config.chatUrl || CHAT_API_URL,
+          baseUrl,
           sessionId,
           message: userMessage.content,
           authToken,

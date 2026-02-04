@@ -125,6 +125,7 @@ export async function* streamChatCompletion(
     body.max_tokens = maxTokens;
   }
 
+  console.log("sending completion request: ", JSON.stringify(body));
   // Make fetch request
   const response = await fetch(`${baseUrl}/api/chat/completion/stream`, {
     method: 'POST',
@@ -136,6 +137,7 @@ export async function* streamChatCompletion(
   if (!response.ok) {
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
     try {
+      console.error(`error from completion: ${response.status} : ${response.statusText}`)
       const errorData = await response.json();
       errorMessage = errorData.message || errorData.detail || errorMessage;
     } catch {

@@ -2,19 +2,28 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import styles from './styles/output.css';
-import {ChatMessage} from "@/types";
+import { ChatMessage } from "@/types";
+
+export interface TokenResponse {
+  token: string;
+  expiresAt?: number; // Unix timestamp in milliseconds, optional
+}
+
+export interface TokenResponse {
+  token: string;
+  expiresAt?: number; // Unix timestamp in milliseconds, optional
+}
 
 export interface WidgetConfig {
-  apiKey?: string,
-  getToken?: () => Promise<string>;
+  apiKey?: string; // Direct API key (for insecure/demo mode) - uses X-API-Key header
+  getToken?: () => Promise<string | TokenResponse>; // Returns token string or TokenResponse with expiration
   onSaveMessages: (messages: ChatMessage[]) => Promise<void>;
   onLoadMessages: () => Promise<ChatMessage[]>;
   headerMsg?: string;
   initialGreeting?: string;
   promptPlaceholder?: string;
-  chatUrl: string; // Required for streaming
+  chatUrl?: string; // optional
   persona?: string; // Optional persona identifier
-  authType?: 'apiKey' | 'bearer'; // Authentication method, defaults to 'bearer'
 }
 
 let isInitialized = false;
