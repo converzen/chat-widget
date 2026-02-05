@@ -30,7 +30,7 @@ Perfect for static websites or quick integration. Just include the script tag:
   <h1>Welcome</h1>
   
   <!-- Include the widget -->
-  <script src="https://cdn.converzent.de/chat-widget/latest/cvz-widget.js"></script>
+  <script src="https://converzen.de/widget/latest/cvz-widget.js"></script>
   
   <!-- Initialize -->
   <script>
@@ -38,11 +38,11 @@ Perfect for static websites or quick integration. Just include the script tag:
       apiKey: "your-api-key-here",
       headerMsg: "Chat with us",
       initialGreeting: "Hello! How can we help you?",
-      onSaveMessages: async (messages) => {
+      onSaveMessages: async (sessionId, messages) => {
         // Save messages to your backend
         await fetch('/api/messages', {
           method: 'POST',
-          body: JSON.stringify(messages)
+          body: JSON.stringify({ sessionId, messages})
         });
       },
       onLoadMessages: async () => {
