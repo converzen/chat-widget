@@ -69,10 +69,10 @@ Once published, users can use via npm CDNs:
 
 ```html
 <!-- unpkg -->
-<script src="https://unpkg.com/@converzent/chat-widget@latest/dist/index.global.js"></script>
+<script src="https://unpkg.com/@converzent/chat-widget@latest/dist/cvz-widget.js"></script>
 
 <!-- jsDelivr -->
-<script src="https://cdn.jsdelivr.net/npm/@converzent/chat-widget@latest/dist/index.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@converzent/chat-widget@latest/dist/cvz-widget.js"></script>
 ```
 
 ## 2. GitHub Repository
@@ -107,21 +107,21 @@ Once published, users can use via npm CDNs:
    - Description: Release notes
 
 2. **Upload build artifacts** (optional):
-   - Upload `dist/index.global.js` as a release asset
+   - Upload `dist/cvz-widget.js` as a release asset
    - Users can download directly or use via jsDelivr
 
 ### Using GitHub CDN (jsDelivr)
 
-If you upload `dist/index.global.js` to releases:
+If you upload `dist/cvz-widget.js` to releases:
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@v1.0.0/dist/index.global.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@v1.0.0/dist/cvz-widget.js"></script>
 ```
 
 Or from main branch:
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@main/dist/index.global.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@main/dist/cvz-widget.js"></script>
 ```
 
 ## 3. CDN Hosting
@@ -134,9 +134,9 @@ Or from main branch:
    ```
 
 2. **Upload to CDN**:
-   - Upload `dist/index.global.js` to your CDN
-   - Organize by version: `/chat-widget/1.0.0/index.global.js`
-   - Create symlink for `latest`: `/chat-widget/latest/index.global.js`
+   - Upload `dist/cvz-widget.js` to your CDN
+   - Organize by version: `/chat-widget/1.0.0/cvz-widget.js`
+   - Create symlink for `latest`: `/chat-widget/latest/cvz-widget.js`
 
 3. **Configure CDN**:
    - Set proper cache headers
@@ -150,7 +150,7 @@ Or from main branch:
 2. **Create `docs` folder**:
    ```bash
    mkdir docs
-   cp dist/index.global.js docs/
+   cp dist/cvz-widget.js docs/
    ```
 
 3. **Commit and push**:
@@ -162,7 +162,7 @@ Or from main branch:
 
 4. **Users can access**:
    ```html
-   <script src="https://converzent.github.io/chat-widget/index.global.js"></script>
+   <script src="https://converzent.github.io/chat-widget/cvz-widget.js"></script>
    ```
 
 ## Version Management

@@ -10,26 +10,26 @@ The widget is already configured to build a CDN-ready file:
 npm run build
 ```
 
-This creates `dist/index.global.js` which can be hosted on any CDN or static file server.
+This creates `dist/cvz-widget.js` which can be hosted on any CDN or static file server.
 
 ## Hosting Options
 
 ### Option 1: Your Own CDN/Server
 
 1. Build the widget: `npm run build`
-2. Upload `dist/index.global.js` to your CDN/server
+2. Upload `dist/cvz-widget.js` to your CDN/server
 3. Users include it via:
    ```html
-   <script src="https://your-cdn.com/chat-widget/index.global.js"></script>
+   <script src="https://your-cdn.com/chat-widget/cvz-widget.js"></script>
    ```
 
 ### Option 2: GitHub Releases
 
 1. Create a GitHub release
-2. Upload `dist/index.global.js` as a release asset
+2. Upload `dist/cvz-widget.js` as a release asset
 3. Users can use via jsDelivr:
    ```html
-   <script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@latest/dist/index.global.js"></script>
+   <script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@latest/dist/cvz-widget.js"></script>
    ```
 
 ### Option 3: npm CDN (unpkg/jsDelivr)
@@ -38,10 +38,10 @@ If published to npm, users can use:
 
 ```html
 <!-- unpkg -->
-<script src="https://unpkg.com/@converzent/chat-widget@latest/dist/index.global.js"></script>
+<script src="https://unpkg.com/@converzent/chat-widget@latest/dist/cvz-widget.js"></script>
 
 <!-- jsDelivr -->
-<script src="https://cdn.jsdelivr.net/npm/@converzent/chat-widget@latest/dist/index.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@converzent/chat-widget@latest/dist/cvz-widget.js"></script>
 ```
 
 ## Versioning
@@ -50,13 +50,13 @@ For production use, pin to a specific version:
 
 ```html
 <!-- Pin to version 1.0.0 -->
-<script src="https://cdn.converzent.de/chat-widget/1.0.0/index.global.js"></script>
+<script src="https://cdn.converzent.de/chat-widget/1.0.0/cvz-widget.js"></script>
 ```
 
 For latest (not recommended for production):
 
 ```html
-<script src="https://cdn.converzent.de/chat-widget/latest/index.global.js"></script>
+<script src="https://cdn.converzent.de/chat-widget/latest/cvz-widget.js"></script>
 ```
 
 ## CDN Configuration
@@ -85,7 +85,7 @@ location /chat-widget/ {
 Once hosted, users can include:
 
 ```html
-<script src="https://cdn.converzent.de/chat-widget/latest/index.global.js"></script>
+<script src="https://cdn.converzent.de/chat-widget/latest/cvz-widget.js"></script>
 <script>
   GMCWidget.init({
     chatUrl: "https://chat.converzent.de",

@@ -38,14 +38,13 @@ export interface WidgetStyle {
 export interface WidgetConfig {
   apiKey?: string; // Direct API key (for insecure/demo mode) - uses X-API-Key header
   getToken?: () => Promise<string | TokenResponse>; // Returns token string or TokenResponse with expiration
-  onSaveMessages: (messages: ChatMessage[]) => Promise<void>;
-  onLoadMessages: () => Promise<ChatMessage[]>;
+  onSaveMessages: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
+  onLoadMessages: () => Promise<{sessionId: string, messages: ChatMessage[]}>;
   headerMsg?: string;
   initialGreeting?: string;
   promptPlaceholder?: string;
   chatUrl?: string; // Optional - defaults to 'https://chat.converzent.de'
   persona?: string; // Optional persona identifier
-  sessionId?: string; // Optional session ID to continue an existing conversation
   style?: WidgetStyle; // Optional styling customization
 }
 

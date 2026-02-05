@@ -30,14 +30,16 @@ interface WidgetStyle {
 interface WidgetConfig {
     apiKey?: string;
     getToken?: () => Promise<string | TokenResponse>;
-    onSaveMessages: (messages: ChatMessage[]) => Promise<void>;
-    onLoadMessages: () => Promise<ChatMessage[]>;
+    onSaveMessages: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
+    onLoadMessages: () => Promise<{
+        sessionId: string;
+        messages: ChatMessage[];
+    }>;
     headerMsg?: string;
     initialGreeting?: string;
     promptPlaceholder?: string;
     chatUrl?: string;
     persona?: string;
-    sessionId?: string;
     style?: WidgetStyle;
 }
 declare function init(config: WidgetConfig): void;

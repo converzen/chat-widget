@@ -360,12 +360,21 @@ const App: React.FC<AppProps> = ({ config }) => {
   useEffect(() => {
     const loadHistory = async () => {
       try {
-        const history = await config.onLoadMessages();
+        const result = await config.onLoadMessages();
         let initialMessages: ChatMessage[] = [];
+        let loadedSessionId: string | null = null;
 
-        if (Array.isArray(history) && history.length > 0) {
-          initialMessages = history;
-        } else if (config.initialGreeting) {
+        // Handle the new return format: {sessionId: string, messages: ChatMessage[]}
+        if (result && typeof result === 'object' && 'messages' in result && 'sessionId' in result) {
+          initialMessages = result.messages || [];
+          loadedSessionId = result.sessionId || null;
+        } else if (Array.isArray(result) && result.length > 0) {
+          // Fallback for backward compatibility (if someone returns just an array)
+          initialMessages = result;
+        }
+
+        // If no messages loaded and we have an initial greeting, use it
+        if (initialMessages.length === 0 && config.initialGreeting) {
           initialMessages = [{
             content: config.initialGreeting,
             role: 'SYSTEM',
@@ -375,10 +384,10 @@ const App: React.FC<AppProps> = ({ config }) => {
 
         setMessages(initialMessages);
         
-        // Restore session ID: priority: config.sessionId > localStorage > null
-        if (config.sessionId) {
-          setSessionId(config.sessionId);
-          localStorage.setItem('cvz-widget-session-id', config.sessionId);
+        // Set session ID from loaded data, or fallback to localStorage
+        if (loadedSessionId) {
+          setSessionId(loadedSessionId);
+          localStorage.setItem('cvz-widget-session-id', loadedSessionId);
         } else {
           const savedSessionId = localStorage.getItem('cvz-widget-session-id');
           if (savedSessionId) {
@@ -509,7 +518,8 @@ const App: React.FC<AppProps> = ({ config }) => {
               };
               const finalMessages = [...updatedMessages, assistantMessage];
               setMessages(finalMessages);
-              await config.onSaveMessages(finalMessages);
+              // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
+              await config.onSaveMessages(sessionId || '', finalMessages);
             }
             setStreamingMessage('');
             setIsStreaming(false);
@@ -540,7 +550,8 @@ const App: React.FC<AppProps> = ({ config }) => {
             };
             const errorMessages = [...updatedMessages, errorMessage];
             setMessages(errorMessages);
-            await config.onSaveMessages(errorMessages);
+            // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
+            await config.onSaveMessages(sessionId || '', errorMessages);
             setStreamingMessage('');
             setIsStreaming(false);
             setIsLoading(false);
@@ -630,7 +641,8 @@ const App: React.FC<AppProps> = ({ config }) => {
       };
       const errorMessages = [...updatedMessages, errorMessage];
       setMessages(errorMessages);
-      await config.onSaveMessages(errorMessages);
+      // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
+      await config.onSaveMessages(sessionId || '', errorMessages);
       setStreamingMessage('');
       setIsStreaming(false);
       setIsLoading(false);
@@ -648,12 +660,14 @@ const App: React.FC<AppProps> = ({ config }) => {
       
       setMessages([]);
       setStreamingMessage('');
+      const currentSessionId = sessionId || '';
       setSessionId(null);
       setIsStreaming(false);
       setIsLoading(false);
       // Clear persisted session ID
       localStorage.removeItem('cvz-widget-session-id');
-      await config.onSaveMessages([]);
+      // Pass sessionId to onSaveMessages (empty string since we're clearing)
+      await config.onSaveMessages('', []);
     }
   };
 

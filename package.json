@@ -2,21 +2,21 @@
   "name": "@converzent/chat-widget",
   "version": "1.0.0",
   "description": "Drop-in chat widget SDK for ConverZent - Easy to integrate, customizable, and fully featured chat widget",
-  "main": "./dist/index.global.js",
-  "browser": "./dist/index.global.js",
+  "main": "./dist/cvz-widget.js",
+  "browser": "./dist/cvz-widget.js",
   "exports": {
     ".": {
-      "import": "./dist/index.global.js",
-      "require": "./dist/index.global.js",
-      "default": "./dist/index.global.js"
+      "import": "./dist/cvz-widget.js",
+      "require": "./dist/cvz-widget.js",
+      "default": "./dist/cvz-widget.js"
     },
     "./markdown": {
-      "import": "./dist/index.global.markdown.js",
-      "require": "./dist/index.global.markdown.js",
-      "default": "./dist/index.global.markdown.js"
+      "import": "./dist/cvz-widget-md.js",
+      "require": "./dist/cvz-widget-md.js",
+      "default": "./dist/cvz-widget-md.js"
     }
   },
-  "types": "./dist/index.d.ts",
+  "types": "./dist/cvz-widget.d.ts",
   "files": [
     "dist",
     "README.md"

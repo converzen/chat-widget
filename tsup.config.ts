@@ -3,11 +3,13 @@ import { defineConfig } from 'tsup';
 export default defineConfig([
   // Lean build (without markdown)
   {
-    entry: ['src/index.ts'],
+    entry: {
+      'cvz-widget': 'src/index.ts',
+    },
     format: ['iife'],
     globalName: 'GMCWidget',
     outDir: 'dist',
-    outExtension: () => ({ js: '.global.js' }),
+    outExtension: () => ({ js: '.js' }),
     clean: true,
     minify: true,
     bundle: true,
@@ -24,12 +26,12 @@ export default defineConfig([
   // Markdown build (with markdown support)
   {
     entry: {
-      'index.global.markdown': 'src/index.markdown.ts',
+      'cvz-widget-md': 'src/index.markdown.ts',
     },
     format: ['iife'],
     globalName: 'GMCWidget',
     outDir: 'dist',
-    outExtension: () => ({ js: '.js' }), // Remove .global since it's in the entry name
+    outExtension: () => ({ js: '.js' }),
     clean: false, // Don't clean on second build
     minify: true,
     bundle: true,

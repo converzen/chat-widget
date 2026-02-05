@@ -30,7 +30,7 @@ Perfect for static websites or quick integration. Just include the script tag:
   <h1>Welcome</h1>
   
   <!-- Include the widget -->
-  <script src="https://cdn.converzent.de/chat-widget/latest/index.global.js"></script>
+  <script src="https://cdn.converzent.de/chat-widget/latest/cvz-widget.js"></script>
   
   <!-- Initialize -->
   <script>
@@ -100,7 +100,7 @@ npm install
 npm run build
 ```
 
-Then include the built file from `dist/index.global.js` in your project.
+Then include the built file from `dist/cvz-widget.js` in your project.
 
 ## Configuration
 
