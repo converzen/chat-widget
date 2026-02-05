@@ -1,4 +1,4 @@
-import { StreamingData } from '../types';
+import { StreamingData } from '@/types';
 
 export interface StreamChatCompletionParams {
   baseUrl: string;
@@ -146,7 +146,7 @@ export async function* streamChatCompletion(
     
     yield {
       type: 'error',
-      message: `${response.status} ${errorMessage}`, // Include status code for error detection
+      detail: `${response.status} ${errorMessage}`, // Include status code for error detection
     };
     return;
   }
@@ -154,7 +154,7 @@ export async function* streamChatCompletion(
   if (!response.body) {
     yield {
       type: 'error',
-      message: 'No response body received',
+      detail: 'No response body received',
     };
     return;
   }
@@ -214,7 +214,7 @@ export async function* streamChatContinuation(
     
     yield {
       type: 'error',
-      message: `${response.status} ${errorMessage}`, // Include status code for error detection
+      detail: `${response.status} ${errorMessage}`, // Include status code for error detection
     };
     return;
   }
@@ -222,7 +222,7 @@ export async function* streamChatContinuation(
   if (!response.body) {
     yield {
       type: 'error',
-      message: 'No response body received',
+      detail: 'No response body received',
     };
     return;
   }

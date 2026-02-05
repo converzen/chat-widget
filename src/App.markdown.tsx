@@ -471,8 +471,6 @@ const App: React.FC<AppProps> = ({ config }) => {
           case 'session_continued':
             if (event.session_id) {
               setSessionId(event.session_id);
-              // Persist session ID to localStorage
-              localStorage.setItem('cvz-widget-session-id', event.session_id);
               console.log('Session ID:', event.session_id);
             }
             break;
@@ -486,7 +484,7 @@ const App: React.FC<AppProps> = ({ config }) => {
 
           case 'done':
             // Finalize the assistant message
-            if (accumulatedContent) {
+            if (accumulatedContent && sessionId) {
               const assistantMessage: ChatMessage = {
                 content: accumulatedContent,
                 role: 'ASSISTANT',
@@ -495,7 +493,7 @@ const App: React.FC<AppProps> = ({ config }) => {
               };
               const finalMessages = [...updatedMessages, assistantMessage];
               setMessages(finalMessages);
-              await config.onSaveMessages(finalMessages);
+              await config.onSaveMessages(sessionId, finalMessages);
             }
             setStreamingMessage('');
             setIsStreaming(false);
@@ -505,7 +503,7 @@ const App: React.FC<AppProps> = ({ config }) => {
 
           case 'error':
             // Check if it's an unauthorized error (401 or 403)
-            const errorMsg = event.message || '';
+            const errorMsg = event.detail || '';
             if ((errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('Unauthorized') || errorMsg.includes('Forbidden')) && 
                 retryCount < maxRetries && 
                 config.getToken && 
