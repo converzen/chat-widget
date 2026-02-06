@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import styles from './styles/output.css';
 import { ChatMessage } from "@/types";
+export {ChatMessage};
 
 const HOST_ELEMENT_ID: string = 'cvz-widget-host'
 
@@ -106,6 +107,16 @@ class WidgetManager {
 // Create the single instance here
 const cvzWidget = new WidgetManager();
 
+// Expose it globally
+declare global {
+    interface Window {
+        cvzWidget: WidgetManager;
+    }
+}
+
+if (typeof window !== 'undefined') {
+    (window as any).cvzWidget = cvzWidget;
+}
+
 // Export it as the default
 export default cvzWidget;
-

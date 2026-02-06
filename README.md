@@ -28,29 +28,48 @@ Perfect for static websites or quick integration. Just include the script tag:
 </head>
 <body>
   <h1>Welcome</h1>
-  
   <!-- Include the widget -->
-  <script src="https://converzen.de/widget/latest/cvz-widget.js"></script>
+  <script
+          async
+          src="https://converzen.de/widget/latest/cvz-widget-md.js"
+          id="cvz-widget-script"
+  ></script>
   
   <!-- Initialize -->
   <script>
-    cvzWidget.init({
-      apiKey: "your-api-key-here",
-      headerMsg: "Chat with us",
-      initialGreeting: "Hello! How can we help you?",
-      onSaveMessages: async (sessionId, messages) => {
-        // Save messages to your backend
-        await fetch('/api/messages', {
-          method: 'POST',
-          body: JSON.stringify({ sessionId, messages})
-        });
-      },
-      onLoadMessages: async () => {
-        // Load messages from your backend
-        const response = await fetch('/api/messages');
-        return response.json();
-      }
-    });
+      (function() {
+          const script = document.getElementById('cvz-widget-script');
+
+          const initWidget = () => {
+              if (window.cvzWidget) {
+                  window.cvzWidget.init({
+                      apiKey: "your-api-key-here",
+                      headerMsg: "Chat with us",
+                      initialGreeting: "Hello! How can we help you?",
+                      onSaveMessages: async (sessionId, messages) => {
+                          // Save messages to your backend
+                          await fetch('/api/messages', {
+                              method: 'POST',
+                              body: JSON.stringify({ sessionId, messages})
+                          });
+                      },
+                      onLoadMessages: async () => {
+                          // Load messages from your backend
+                          const response = await fetch('/api/messages');
+                          return response.json();
+                      }
+                  });
+              }
+          };
+
+          // Case 1: Script finishes loading after this block runs
+          script.addEventListener('load', initWidget);
+
+          // Case 2: Script was already cached/loaded (Fail-safe)
+          if (window.cvzWidget) {
+              initWidget();
+          }
+      })();
   </script>
 </body>
 </html>

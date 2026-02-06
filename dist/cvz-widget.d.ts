@@ -41,7 +41,18 @@ interface WidgetConfig {
     chatUrl?: string;
     persona?: string;
     style?: WidgetStyle;
+    enableMarkdown?: boolean;
 }
-declare function init(config: WidgetConfig): void;
+declare class WidgetManager {
+    private hostElement;
+    init(config: WidgetConfig): void;
+    hide(): void;
+}
+declare const cvzWidget: WidgetManager;
+declare global {
+    interface Window {
+        cvzWidget: WidgetManager;
+    }
+}
 
-export { type TokenResponse, type WidgetConfig, type WidgetStyle, init };
+export { type ChatMessage, type TokenResponse, type WidgetConfig, type WidgetStyle, cvzWidget as default };

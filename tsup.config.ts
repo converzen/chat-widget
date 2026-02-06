@@ -7,13 +7,13 @@ export default defineConfig([
       'cvz-widget': 'src/index.ts',
     },
     format: ['iife'],
-    globalName: 'cvzWidget',
+    // globalName removed to allow manual assignment in index.ts
     outDir: 'dist',
     outExtension: () => ({ js: '.js' }),
     clean: false, // Don't clean on second build
     minify: true,
     bundle: true,
-    dts: false, // Only generate DTS once
+    dts: true,
     noExternal: [/(.*)/],
     platform: 'browser',
     loader: {

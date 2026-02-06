@@ -1,39 +1,66 @@
 <body>
   <h1>My Client Site</h1>
-  <script src="./dist/cvz-widget.js"></script>
+  <!-- <script src="./dist/cvz-widget.js"></script> -->
+  <!-- src="https://converzen.de/widget/latest/cvz-widget.js" -->
+  <script
+          async
+          src="./dist/cvz-widget.js"
+          id="cvz-widget-script"
+  ></script>
+
   <script>
-    window.cvzWidget.init({
-      // Required configuration
-      chatUrl: "https://chat.converzent.de", // Replace with your actual chat API URL
-      
-      // API Key (for insecure/demo mode)
-      apiKey: "sk_test_dwzR2yDj35AGcgHbw9cpaBRgb9qEkvFE",
-      persona: { "version_type": "next", "persona_id": 1 },
-      // Customization
-      headerMsg: "Chat with an Expert",
-      initialGreeting: "Hello! How can we help you today?",
-      promptPlaceholder: "Your question...",
-      enableMarkdown: true,
-      style: {
-            position: 'bottom-left', // or { bottom: '20px', left: '20px' }
-            dialogSize: 'large', // or { width: 400, height: 600 }
-            frameColor: '#E5E7EB',
-            buttonColor: {
-                normal: '#2563EB',
-                hover: '#1D4ED8',
-                open: '#1F2937'
-            }
-        },
-      // Authentication: Use either apiKey OR getToken (not both)
-      // - apiKey: Direct API key for insecure/demo mode (uses X-API-Key header)
-      // - getToken: Callback that returns token string or { token: string, expiresAt?: number }
-      //   getToken: async () => "mock-jwt-token", // Simple string token
-      //   getToken: async () => ({ token: "mock-jwt-token", expiresAt: Date.now() + 3600000 }), // With expiration
-      onSaveMessages: async (m) => console.log("Saving:", m),
-      onLoadMessages: async () => {
-        console.log("Loading messages...");
-        return []; // Return empty array to see the initialGreeting
-      }
-    });
+      (function() {
+          const script = document.getElementById('cvz-widget-script');
+
+          const initWidget = () => {
+              console.log("initWidget() ")
+              if (window.cvzWidget) {
+                  window.cvzWidget.init({
+                      // Required configuration
+                      chatUrl: "https://chat.converzent.de", // Replace with your actual chat API URL
+
+                      // API Key (for insecure/demo mode)
+                      apiKey: "sk_test_dwzR2yDj35AGcgHbw9cpaBRgb9qEkvFE",
+                      persona: { "version_type": "next", "persona_id": 1 },
+                      // Customization
+                      headerMsg: "Chat with an Expert",
+                      initialGreeting: "Hello! How can we help you today?",
+                      promptPlaceholder: "Your question...",
+                      enableMarkdown: true,
+                      style: {
+                          position: 'bottom-left', // or { bottom: '20px', left: '20px' }
+                          dialogSize: 'large', // or { width: 400, height: 600 }
+                          frameColor: '#E5E7EB',
+                          buttonColor: {
+                              normal: '#2563EB',
+                              hover: '#1D4ED8',
+                              open: '#1F2937'
+                          }
+                      },
+                      // Authentication: Use either apiKey OR getToken (not both)
+                      // - apiKey: Direct API key for insecure/demo mode (uses X-API-Key header)
+                      // - getToken: Callback that returns token string or { token: string, expiresAt?: number }
+                      //   getToken: async () => "mock-jwt-token", // Simple string token
+                      //   getToken: async () => ({ token: "mock-jwt-token", expiresAt: Date.now() + 3600000 }), // With expiration
+                      onSaveMessages: async (m) => console.log("Saving:", m),
+                      onLoadMessages: async () => {
+                          console.log("Loading messages...");
+                          return []; // Return empty array to see the initialGreeting
+                      }
+                  });
+              } else {
+                  console.log("No cvsWidget")
+              }
+          };
+
+          // Case 1: Script finishes loading after this block runs
+          script.addEventListener('load', initWidget);
+
+          console.log("trying if script is already loaded")
+          // Case 2: Script was already cached/loaded (Fail-safe)
+          if (window.cvzWidget) {
+              initWidget();
+          }
+      })();
   </script>
 </body>
