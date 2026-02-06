@@ -562,7 +562,10 @@ const App = ({ config }: AppProps) => {
           case 'token':
             if (event.content) {
               accumulatedContent += event.content;
-              setStreamingMessage(accumulatedContent);
+              // Use requestAnimationFrame to ensure Preact processes the state update
+              requestAnimationFrame(() => {
+                setStreamingMessage(accumulatedContent);
+              });
             }
             break;
 
@@ -580,8 +583,9 @@ const App = ({ config }: AppProps) => {
               };
               const finalMessages = [...updatedMessages, assistantMessage];
               
-              // Update all states together - React will batch these updates
-              setMessages(finalMessages);
+              // Update all states together - Preact will batch these updates
+              // Use functional updates to ensure we have the latest state
+              setMessages((prev) => finalMessages);
               setStreamingMessage('');
               setIsStreaming(false);
               setIsLoading(false);
@@ -679,8 +683,10 @@ const App = ({ config }: AppProps) => {
       createdAt: new Date().toISOString(),
     };
 
+    // Use functional update to ensure we have the latest messages state
+    setMessages((prev) => [...prev, userMessage]);
+    // Compute updatedMessages for use in executeStreaming
     const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
     setInputValue('');
     setIsLoading(true);
     setIsStreaming(true);

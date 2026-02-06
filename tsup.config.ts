@@ -22,10 +22,10 @@ export default defineConfig([
     },
     esbuildOptions(options) {
       // Alias react and react-dom to preact/compat for react-markdown compatibility
-      options.alias = {
-        'react': 'preact/compat',
-        'react-dom': 'preact/compat',
-      };
+      options.alias = options.alias || {};
+      options.alias['react'] = 'preact/compat';
+      options.alias['react-dom'] = 'preact/compat';
+      options.alias['react/jsx-runtime'] = 'preact/jsx-runtime';
     },
   },
 ]);

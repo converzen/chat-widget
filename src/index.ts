@@ -1,6 +1,17 @@
-import { createElement } from 'preact';
+import { createElement, options } from 'preact';
 import { render } from 'preact';
 import App from './App';
+
+// Configure Preact to ensure state updates trigger re-renders
+// This helps with async state updates from generators
+if (options) {
+  // Ensure debounceRendering doesn't interfere with updates
+  const originalDebounce = options.debounceRendering;
+  options.debounceRendering = (callback: () => void) => {
+    // Use requestAnimationFrame for smooth rendering
+    requestAnimationFrame(callback);
+  };
+}
 import styles from './styles/output.css';
 import { ChatMessage } from "@/types";
 export {ChatMessage};
