@@ -1,6 +1,9 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { WidgetConfig, WidgetStyle } from './index.markdown';
+import { createElement } from 'preact';
+import { useState, useEffect, useRef, useLayoutEffect } from 'preact/hooks';
+import type { ComponentChildren, RefObject } from 'preact';
+import type { CSSProperties } from 'preact/compat';
+import { WidgetConfig, WidgetStyle } from './index';
 import { ChatMessage } from './types';
 import { streamChatCompletion, streamChatContinuation } from './services/streaming';
 import ReactMarkdown from 'react-markdown';
@@ -10,7 +13,7 @@ const DEFAULT_CHAT_API_URL = 'https://chat.converzent.de';
 
 // --- Style Helper Functions ---
 
-const getPositionStyles = (style?: WidgetStyle): React.CSSProperties => {
+const getPositionStyles = (style?: WidgetStyle): CSSProperties => {
   if (!style?.position) {
     return { bottom: '1rem', right: '1rem' }; // Default: bottom-right
   }
@@ -31,7 +34,7 @@ const getPositionStyles = (style?: WidgetStyle): React.CSSProperties => {
     }
   } else {
     // Custom position
-    const pos: React.CSSProperties = {};
+    const pos: CSSProperties = {};
     if (style.position.bottom) pos.bottom = style.position.bottom;
     if (style.position.top) pos.top = style.position.top;
     if (style.position.left) pos.left = style.position.left;
@@ -40,7 +43,7 @@ const getPositionStyles = (style?: WidgetStyle): React.CSSProperties => {
   }
 };
 
-const getDialogSize = (style?: WidgetStyle): React.CSSProperties => {
+const getDialogSize = (style?: WidgetStyle): CSSProperties => {
   if (!style?.dialogSize) {
     return { width: '350px', height: '500px' }; // Default: medium
   }
@@ -70,7 +73,7 @@ const getFrameColor = (style?: WidgetStyle): string => {
   return style?.frameColor || '#E5E7EB'; // Default: gray-200
 };
 
-const getButtonColors = (style?: WidgetStyle, isOpen?: boolean): React.CSSProperties => {
+const getButtonColors = (style?: WidgetStyle, isOpen?: boolean): CSSProperties => {
   const colors = style?.buttonColor;
   
   if (isOpen) {
@@ -82,7 +85,7 @@ const getButtonColors = (style?: WidgetStyle, isOpen?: boolean): React.CSSProper
   return {
     backgroundColor: colors?.normal || '#2563EB', // Default: blue-600
     '--hover-color': colors?.hover || '#1D4ED8', // Default: blue-700
-  } as React.CSSProperties;
+  } as CSSProperties;
 };
 
 const ChatIcon = () => (
@@ -116,41 +119,62 @@ interface AppProps {
   config: WidgetConfig;
 }
 
+// Type alias for Preact compatibility
+type ReactNode = ComponentChildren;
+
 // --- Components ---
 
 const ChatHeader = ({ 
   title, 
   subtitle, 
   onClose, 
-  onClear 
+  onClear,
+  darkMode
 }: { 
   title: string; 
   subtitle?: string; 
   onClose: () => void; 
-  onClear: () => void; 
+  onClear: () => void;
+  darkMode?: boolean;
 }) => (
-  <div className="cvz-bg-gradient-to-b cvz-from-blue-600 cvz-to-blue-500 cvz-text-white cvz-p-4 cvz-shadow-md cvz-flex cvz-justify-between cvz-items-start">
+  <div className={`cvz-p-4 cvz-shadow-md cvz-flex cvz-justify-between cvz-items-start ${
+    darkMode 
+      ? 'cvz-bg-gradient-to-b cvz-from-gray-900 cvz-to-gray-800 cvz-text-white' 
+      : 'cvz-bg-gradient-to-b cvz-from-blue-600 cvz-to-blue-500 cvz-text-white'
+  }`}>
     <div className="cvz-flex cvz-items-center cvz-gap-3">
       <div className="cvz-relative">
-        <div className="cvz-w-2.5 cvz-h-2.5 cvz-bg-green-400 cvz-rounded-full cvz-border-2 cvz-border-blue-600"></div>
+        <div className={`cvz-w-2.5 cvz-h-2.5 cvz-bg-green-400 cvz-rounded-full cvz-border-2 ${
+          darkMode ? 'cvz-border-gray-800' : 'cvz-border-blue-600'
+        }`}></div>
         <div className="cvz-absolute cvz-top-0 cvz-left-0 cvz-w-2.5 cvz-h-2.5 cvz-bg-green-400 cvz-rounded-full cvz-animate-ping cvz-opacity-75"></div>
       </div>
       <div>
         <h3 className="cvz-font-bold cvz-text-lg cvz-leading-tight">{title}</h3>
-        {subtitle && <p className="cvz-text-xs cvz-text-blue-100 cvz-mt-0.5">{subtitle}</p>}
+        {subtitle && <p className={`cvz-text-xs cvz-mt-0.5 ${
+          darkMode ? 'cvz-text-gray-300' : 'cvz-text-blue-100'
+        }`}>{subtitle}</p>}
       </div>
     </div>
     <div className="cvz-flex cvz-gap-2">
       <button 
         onClick={onClear}
-        className="cvz-text-blue-200 cvz-hover:cvz-text-white cvz-transition-colors cvz-p-1 cvz-rounded-md cvz-hover:cvz-bg-blue-600/50"
+        className={`cvz-transition-colors cvz-p-1 cvz-rounded-md ${
+          darkMode 
+            ? 'cvz-text-gray-400 cvz-hover:cvz-text-white cvz-hover:cvz-bg-gray-700/50' 
+            : 'cvz-text-blue-200 cvz-hover:cvz-text-white cvz-hover:cvz-bg-blue-600/50'
+        }`}
         title="Clear History"
       >
         <TrashIcon />
       </button>
       <button 
         onClick={onClose}
-        className="cvz-text-blue-200 cvz-hover:cvz-text-white cvz-transition-colors cvz-p-1 cvz-rounded-md cvz-hover:cvz-bg-blue-600/50"
+        className={`cvz-transition-colors cvz-p-1 cvz-rounded-md ${
+          darkMode 
+            ? 'cvz-text-gray-400 cvz-hover:cvz-text-white cvz-hover:cvz-bg-gray-700/50' 
+            : 'cvz-text-blue-200 cvz-hover:cvz-text-white cvz-hover:cvz-bg-blue-600/50'
+        }`}
         title="Close Chat"
       >
         <XMarkIcon />
@@ -162,29 +186,41 @@ const ChatHeader = ({
 // MessageContent component that renders markdown (static import for markdown build)
 const MessageContent = ({ 
   content, 
-  enableMarkdown 
+  enableMarkdown,
+  darkMode
 }: { 
   content: string; 
-  enableMarkdown?: boolean; 
+  enableMarkdown?: boolean;
+  darkMode?: boolean;
 }) => {
   if (enableMarkdown) {
     return (
       <div className="cvz-markdown-content">
         <ReactMarkdown
           components={{
-            p: ({ children }) => <p className="cvz-mb-2 cvz-last:cvz-mb-0">{children}</p>,
-            h1: ({ children }) => <h1 className="cvz-text-xl cvz-font-bold cvz-mb-2 cvz-mt-4 cvz-first:cvz-mt-0">{children}</h1>,
-            h2: ({ children }) => <h2 className="cvz-text-lg cvz-font-bold cvz-mb-2 cvz-mt-3 cvz-first:cvz-mt-0">{children}</h2>,
-            h3: ({ children }) => <h3 className="cvz-text-base cvz-font-bold cvz-mb-1 cvz-mt-2 cvz-first:cvz-mt-0">{children}</h3>,
-            ul: ({ children }) => <ul className="cvz-list-disc cvz-list-inside cvz-mb-2 cvz-space-y-1">{children}</ul>,
-            ol: ({ children }) => <ol className="cvz-list-decimal cvz-list-inside cvz-mb-2 cvz-space-y-1">{children}</ol>,
-            li: ({ children }) => <li className="cvz-ml-2">{children}</li>,
-            code: ({ children }) => <code className="cvz-bg-gray-100 cvz-px-1 cvz-py-0.5 cvz-rounded cvz-text-sm cvz-font-mono">{children}</code>,
-            pre: ({ children }) => <pre className="cvz-bg-gray-100 cvz-p-2 cvz-rounded cvz-overflow-x-auto cvz-mb-2 cvz-text-sm cvz-font-mono">{children}</pre>,
-            blockquote: ({ children }) => <blockquote className="cvz-border-l-4 cvz-border-gray-300 cvz-pl-3 cvz-italic cvz-mb-2">{children}</blockquote>,
-            strong: ({ children }) => <strong className="cvz-font-bold">{children}</strong>,
-            em: ({ children }) => <em className="cvz-italic">{children}</em>,
-            a: ({ children, href }) => <a href={href} className="cvz-text-blue-600 cvz-underline cvz-hover:cvz-text-blue-800" target="_blank" rel="noopener noreferrer">{children}</a>,
+            p: ({ children }: { children: ReactNode }) => <p className={`cvz-mb-2 cvz-last:cvz-mb-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</p>,
+            h1: ({ children }: { children: ReactNode }) => <h1 className={`cvz-text-xl cvz-font-bold cvz-mb-2 cvz-mt-4 cvz-first:cvz-mt-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</h1>,
+            h2: ({ children }: { children: ReactNode }) => <h2 className={`cvz-text-lg cvz-font-bold cvz-mb-2 cvz-mt-3 cvz-first:cvz-mt-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</h2>,
+            h3: ({ children }: { children: ReactNode }) => <h3 className={`cvz-text-base cvz-font-bold cvz-mb-1 cvz-mt-2 cvz-first:cvz-mt-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</h3>,
+            ul: ({ children }: { children: ReactNode }) => <ul className={`cvz-list-disc cvz-list-inside cvz-mb-2 cvz-space-y-1 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</ul>,
+            ol: ({ children }: { children: ReactNode }) => <ol className={`cvz-list-decimal cvz-list-inside cvz-mb-2 cvz-space-y-1 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</ol>,
+            li: ({ children }: { children: ReactNode }) => <li className="cvz-ml-2">{children}</li>,
+            code: ({ children }: { children: ReactNode }) => <code className={`cvz-px-1 cvz-py-0.5 cvz-rounded cvz-text-sm cvz-font-mono ${
+              darkMode ? 'cvz-bg-gray-700 cvz-text-gray-100' : 'cvz-bg-gray-100'
+            }`}>{children}</code>,
+            pre: ({ children }: { children: ReactNode }) => <pre className={`cvz-p-2 cvz-rounded cvz-overflow-x-auto cvz-mb-2 cvz-text-sm cvz-font-mono ${
+              darkMode ? 'cvz-bg-gray-700 cvz-text-gray-100' : 'cvz-bg-gray-100'
+            }`}>{children}</pre>,
+            blockquote: ({ children }: { children: ReactNode }) => <blockquote className={`cvz-border-l-4 cvz-pl-3 cvz-italic cvz-mb-2 ${
+              darkMode ? 'cvz-border-gray-600 cvz-text-gray-300' : 'cvz-border-gray-300'
+            }`}>{children}</blockquote>,
+            strong: ({ children }: { children: ReactNode }) => <strong className="cvz-font-bold">{children}</strong>,
+            em: ({ children }: { children: ReactNode }) => <em className="cvz-italic">{children}</em>,
+            a: ({ children, href }: { children: ReactNode; href?: string }) => <a href={href} className={`cvz-underline ${
+              darkMode 
+                ? 'cvz-text-blue-400 cvz-hover:cvz-text-blue-300' 
+                : 'cvz-text-blue-600 cvz-hover:cvz-text-blue-800'
+            }`} target="_blank" rel="noopener noreferrer">{children}</a>,
           }}
         >
           {content}
@@ -192,7 +228,7 @@ const MessageContent = ({
       </div>
     );
   }
-  return <>{content}</>;
+  return createElement('span', null, content);
 };
 
 const ChatMessages = ({ 
@@ -200,13 +236,15 @@ const ChatMessages = ({
   isStreaming,
   streamingMessage,
   messagesEndRef,
-  enableMarkdown
+  enableMarkdown,
+  darkMode
 }: { 
   messages: ChatMessage[];
   isStreaming: boolean;
   streamingMessage: string;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: RefObject<HTMLDivElement>;
   enableMarkdown?: boolean;
+  darkMode?: boolean;
 }) => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -236,10 +274,16 @@ const ChatMessages = ({
   return (
     <div 
       ref={messagesContainerRef}
-      className="cvz-flex-1 cvz-overflow-y-auto cvz-p-4 cvz-bg-gray-50 cvz-space-y-4"
+      className={`cvz-flex-1 cvz-overflow-y-auto cvz-p-4 cvz-space-y-4 ${
+        darkMode 
+          ? 'cvz-bg-gray-900 cvz-scrollbar-dark' 
+          : 'cvz-bg-gray-50 cvz-scrollbar-light'
+      }`}
     >
       {messages.length === 0 && !streamingMessage && (
-        <div className="cvz-flex cvz-flex-col cvz-items-center cvz-justify-center cvz-h-full cvz-text-gray-400 cvz-space-y-2">
+        <div className={`cvz-flex cvz-flex-col cvz-items-center cvz-justify-center cvz-h-full cvz-space-y-2 ${
+          darkMode ? 'cvz-text-gray-500' : 'cvz-text-gray-400'
+        }`}>
           <ChatIcon />
           <p className="cvz-text-sm">Start a conversation</p>
         </div>
@@ -252,28 +296,46 @@ const ChatMessages = ({
           <div
             className={`cvz-max-w-[85%] cvz-p-3 cvz-rounded-2xl cvz-text-sm cvz-shadow-sm ${
               msg.role === 'USER'
-                ? 'cvz-bg-blue-600 cvz-text-white cvz-rounded-br-none'
-                : 'cvz-bg-white cvz-text-gray-800 cvz-border cvz-border-gray-100 cvz-rounded-bl-none'
+                ? darkMode
+                  ? 'cvz-bg-blue-500 cvz-text-white cvz-rounded-br-none'
+                  : 'cvz-bg-blue-600 cvz-text-white cvz-rounded-br-none'
+                : darkMode
+                  ? 'cvz-bg-gray-800 cvz-text-gray-100 cvz-border cvz-border-gray-700 cvz-rounded-bl-none'
+                  : 'cvz-bg-white cvz-text-gray-800 cvz-border cvz-border-gray-100 cvz-rounded-bl-none'
             }`}
           >
-            <MessageContent content={msg.content} enableMarkdown={enableMarkdown} />
+            <MessageContent content={msg.content} enableMarkdown={enableMarkdown} darkMode={darkMode} />
           </div>
         </div>
       ))}
-      {isStreaming && streamingMessage && (
+      {isStreaming && streamingMessage && !isFinalizingRef.current && (
         <div className="cvz-flex cvz-justify-start">
-          <div className="cvz-max-w-[85%] cvz-bg-white cvz-border cvz-border-gray-100 cvz-p-3 cvz-rounded-2xl cvz-rounded-bl-none cvz-text-sm cvz-shadow-sm cvz-text-gray-800">
+          <div className={`cvz-max-w-[85%] cvz-p-3 cvz-rounded-2xl cvz-rounded-bl-none cvz-text-sm cvz-shadow-sm cvz-border ${
+            darkMode
+              ? 'cvz-bg-gray-800 cvz-text-gray-100 cvz-border-gray-700'
+              : 'cvz-bg-white cvz-text-gray-800 cvz-border-gray-100'
+          }`}>
             {streamingMessage}
           </div>
         </div>
       )}
       {isStreaming && !streamingMessage && (
         <div className="cvz-flex cvz-justify-start">
-          <div className="cvz-bg-white cvz-border cvz-border-gray-100 cvz-p-3 cvz-rounded-2xl cvz-rounded-bl-none cvz-shadow-sm">
+          <div className={`cvz-p-3 cvz-rounded-2xl cvz-rounded-bl-none cvz-shadow-sm cvz-border ${
+            darkMode
+              ? 'cvz-bg-gray-800 cvz-border-gray-700'
+              : 'cvz-bg-white cvz-border-gray-100'
+          }`}>
             <div className="cvz-flex cvz-space-x-1">
-              <div className="cvz-w-2 cvz-h-2 cvz-bg-gray-400 cvz-rounded-full cvz-animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="cvz-w-2 cvz-h-2 cvz-bg-gray-400 cvz-rounded-full cvz-animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="cvz-w-2 cvz-h-2 cvz-bg-gray-400 cvz-rounded-full cvz-animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              <div className={`cvz-w-2 cvz-h-2 cvz-rounded-full cvz-animate-bounce ${
+                darkMode ? 'cvz-bg-gray-500' : 'cvz-bg-gray-400'
+              }`} style={{ animationDelay: '0ms' }}></div>
+              <div className={`cvz-w-2 cvz-h-2 cvz-rounded-full cvz-animate-bounce ${
+                darkMode ? 'cvz-bg-gray-500' : 'cvz-bg-gray-400'
+              }`} style={{ animationDelay: '150ms' }}></div>
+              <div className={`cvz-w-2 cvz-h-2 cvz-rounded-full cvz-animate-bounce ${
+                darkMode ? 'cvz-bg-gray-500' : 'cvz-bg-gray-400'
+              }`} style={{ animationDelay: '300ms' }}></div>
             </div>
           </div>
         </div>
@@ -288,40 +350,56 @@ const ChatInput = ({
   onChange, 
   onSubmit, 
   isLoading, 
-  placeholder 
+  placeholder,
+  darkMode
 }: { 
   value: string; 
   onChange: (val: string) => void; 
-  onSubmit: (e?: React.FormEvent) => void; 
+  onSubmit: (e?: Event) => void; 
   isLoading: boolean; 
-  placeholder: string; 
+  placeholder: string;
+  darkMode?: boolean;
 }) => (
-  <form onSubmit={onSubmit} className="cvz-p-4 cvz-bg-white cvz-border-t cvz-border-gray-100">
+  <form onSubmit={onSubmit} className={`cvz-p-4 cvz-border-t ${
+    darkMode 
+      ? 'cvz-bg-gray-800 cvz-border-gray-700' 
+      : 'cvz-bg-white cvz-border-gray-100'
+  }`}>
     <div className="cvz-relative cvz-flex cvz-items-center">
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="cvz-w-full cvz-bg-gray-50 cvz-border cvz-border-gray-200 cvz-text-gray-900 cvz-text-sm cvz-rounded-full cvz-pl-4 cvz-pr-12 cvz-py-3 cvz-focus:cvz-outline-none cvz-focus:cvz-border-blue-500 cvz-focus:cvz-ring-1 cvz-focus:cvz-ring-blue-500 cvz-transition-all"
+        className={`cvz-w-full cvz-border cvz-text-sm cvz-rounded-full cvz-pl-4 cvz-pr-12 cvz-py-3 cvz-focus:cvz-outline-none cvz-focus:cvz-ring-1 cvz-transition-all ${
+          darkMode
+            ? 'cvz-bg-gray-700 cvz-border-gray-600 cvz-text-gray-100 cvz-placeholder-gray-400 cvz-focus:cvz-border-blue-500 cvz-focus:cvz-ring-blue-500'
+            : 'cvz-bg-gray-50 cvz-border-gray-200 cvz-text-gray-900 cvz-focus:cvz-border-blue-500 cvz-focus:cvz-ring-blue-500'
+        }`}
       />
       <button
         type="submit"
         disabled={!value.trim() || isLoading}
-        className="cvz-absolute cvz-right-2 cvz-p-2 cvz-bg-blue-600 cvz-text-white cvz-rounded-full cvz-hover:cvz-bg-blue-700 cvz-disabled:cvz-opacity-50 cvz-disabled:cvz-hover:cvz-bg-blue-600 cvz-transition-colors cvz-shadow-sm"
+        className={`cvz-absolute cvz-right-2 cvz-p-2 cvz-text-white cvz-rounded-full cvz-disabled:cvz-opacity-50 cvz-transition-colors cvz-shadow-sm ${
+          darkMode
+            ? 'cvz-bg-blue-500 cvz-hover:cvz-bg-blue-600 cvz-disabled:cvz-hover:cvz-bg-blue-500'
+            : 'cvz-bg-blue-600 cvz-hover:cvz-bg-blue-700 cvz-disabled:cvz-hover:cvz-bg-blue-600'
+        }`}
       >
         <PaperAirplaneIcon />
       </button>
     </div>
     <div className="cvz-text-center cvz-mt-2">
-      <p className="cvz-text-[10px] cvz-text-gray-400">Powered by ConverZent</p>
+      <p className={`cvz-text-[10px] ${
+        darkMode ? 'cvz-text-gray-500' : 'cvz-text-gray-400'
+      }`}>Powered by ConverZent</p>
     </div>
   </form>
 );
 
 // --- Main App ---
 
-const App: React.FC<AppProps> = ({ config }) => {
+const App = ({ config }: AppProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -332,6 +410,7 @@ const App: React.FC<AppProps> = ({ config }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const tokenCacheRef = useRef<{ token: string; expiresAt: number | null } | null>(null);
+  const isFinalizingRef = useRef(false);
 
   // Load messages and session ID on mount
   useEffect(() => {
@@ -432,8 +511,11 @@ const App: React.FC<AppProps> = ({ config }) => {
       const auth = await getAuthToken(retryCount > 0); // Force refresh on retry
       const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL; // Defaults to 'https://chat.converzent.de'
       
+      // Track sessionId locally to avoid React state closure issues
+      let currentSessionId = sessionId || '';
+      
       // Determine which endpoint to use based on sessionId
-      const useCompletion = !sessionId;
+      const useCompletion = !currentSessionId;
       
       let streamGenerator;
       if (useCompletion) {
@@ -448,7 +530,7 @@ const App: React.FC<AppProps> = ({ config }) => {
       } else {
         streamGenerator = streamChatContinuation({
           baseUrl,
-          sessionId: sessionId!,
+          sessionId: currentSessionId,
           message: userMessage.content,
           authToken: auth.token,
           authType: auth.type,
@@ -470,7 +552,9 @@ const App: React.FC<AppProps> = ({ config }) => {
           case 'session_created':
           case 'session_continued':
             if (event.session_id) {
+              currentSessionId = event.session_id;
               setSessionId(event.session_id);
+              localStorage.setItem('cvz-widget-session-id', event.session_id);
               console.log('Session ID:', event.session_id);
             }
             break;
@@ -484,7 +568,10 @@ const App: React.FC<AppProps> = ({ config }) => {
 
           case 'done':
             // Finalize the assistant message
-            if (accumulatedContent && sessionId) {
+            if (accumulatedContent && currentSessionId) {
+              // Set flag to prevent streaming message from rendering during finalization
+              isFinalizingRef.current = true;
+              
               const assistantMessage: ChatMessage = {
                 content: accumulatedContent,
                 role: 'ASSISTANT',
@@ -492,12 +579,24 @@ const App: React.FC<AppProps> = ({ config }) => {
                 sources: event.sources,
               };
               const finalMessages = [...updatedMessages, assistantMessage];
+              
+              // Update all states together - React will batch these updates
               setMessages(finalMessages);
-              await config.onSaveMessages(sessionId, finalMessages);
+              setStreamingMessage('');
+              setIsStreaming(false);
+              setIsLoading(false);
+              
+              // Reset flag after state updates
+              setTimeout(() => {
+                isFinalizingRef.current = false;
+              }, 0);
+              
+              await config.onSaveMessages(currentSessionId, finalMessages);
+            } else {
+              setStreamingMessage('');
+              setIsStreaming(false);
+              setIsLoading(false);
             }
-            setStreamingMessage('');
-            setIsStreaming(false);
-            setIsLoading(false);
             abortControllerRef.current = null;
             return;
 
@@ -525,7 +624,7 @@ const App: React.FC<AppProps> = ({ config }) => {
             const errorMessages = [...updatedMessages, errorMessage];
             setMessages(errorMessages);
             // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
-            await config.onSaveMessages(sessionId || '', errorMessages);
+            await config.onSaveMessages(currentSessionId || '', errorMessages);
             setStreamingMessage('');
             setIsStreaming(false);
             setIsLoading(false);
@@ -565,7 +664,7 @@ const App: React.FC<AppProps> = ({ config }) => {
     }
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
+  const handleSendMessage = async (e?: Event) => {
     e?.preventDefault();
     if (!inputValue.trim() || isStreaming) return;
 
@@ -668,8 +767,9 @@ const App: React.FC<AppProps> = ({ config }) => {
       {/* Chat Window Container with Transition Logic */}
       <div 
         className={`
-          cvz-absolute cvz-bg-white cvz-rounded-2xl cvz-shadow-2xl cvz-flex cvz-flex-col cvz-overflow-hidden
+          cvz-absolute cvz-rounded-2xl cvz-shadow-2xl cvz-flex cvz-flex-col cvz-overflow-hidden
           cvz-transition-all cvz-duration-300
+          ${config.darkMode ? 'cvz-bg-gray-800' : 'cvz-bg-white'}
           ${isBottomPosition ? 'cvz-bottom-20' : 'cvz-top-20'}
           ${isRightPosition ? 'cvz-right-0' : 'cvz-left-0'}
           ${isBottomPosition && isRightPosition ? 'cvz-origin-bottom-right' : 
@@ -688,9 +788,10 @@ const App: React.FC<AppProps> = ({ config }) => {
       >
         <ChatHeader 
           title={config.headerMsg || 'Support Chat'} 
-          subtitle="We typically reply in a few minutes"
+          subtitle={config.subheaderMsg || "We typically reply in a few minutes"}
           onClose={() => setIsOpen(false)}
           onClear={handleClearHistory}
+          darkMode={config.darkMode}
         />
 
         <ChatMessages 
@@ -699,6 +800,7 @@ const App: React.FC<AppProps> = ({ config }) => {
           streamingMessage={streamingMessage}
           messagesEndRef={messagesEndRef}
           enableMarkdown={config.enableMarkdown}
+          darkMode={config.darkMode}
         />
 
         <ChatInput 
@@ -707,6 +809,7 @@ const App: React.FC<AppProps> = ({ config }) => {
           onSubmit={handleSendMessage} 
           isLoading={isLoading || isStreaming}
           placeholder={config.promptPlaceholder || "Type a message..."}
+          darkMode={config.darkMode}
         />
       </div>
 

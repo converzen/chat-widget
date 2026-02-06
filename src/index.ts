@@ -1,5 +1,5 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
+import { createElement } from 'preact';
+import { render } from 'preact';
 import App from './App';
 import styles from './styles/output.css';
 import { ChatMessage } from "@/types";
@@ -44,10 +44,12 @@ export interface WidgetConfig {
   onSaveMessages: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
   onLoadMessages: () => Promise<{sessionId: string, messages: ChatMessage[]}>;
   headerMsg?: string;
+  subheaderMsg?: string; // Optional subheader text below the title (default: "We typically reply in a few minutes")
   initialGreeting?: string;
   promptPlaceholder?: string;
   chatUrl?: string; // Optional - defaults to 'https://chat.converzent.de'
   persona?: string; // Optional persona identifier
+  darkMode?: boolean; // Optional - enable dark mode theme (default: false)
   style?: WidgetStyle; // Optional styling customization
   enableMarkdown?: boolean; // Optional - enable markdown rendering in messages (default: false). Requires markdown build.
 }
@@ -78,14 +80,13 @@ class WidgetManager {
         styleTag.textContent = styles;
         shadowRoot.appendChild(styleTag);
 
-        // Create React Root
-        const reactRootElement = document.createElement('div');
-        reactRootElement.id = 'cvz-root';
-        shadowRoot.appendChild(reactRootElement);
+        // Create Preact Root
+        const preactRootElement = document.createElement('div');
+        preactRootElement.id = 'cvz-root';
+        shadowRoot.appendChild(preactRootElement);
 
         // Render the App
-        const root = createRoot(reactRootElement);
-        root.render(React.createElement(App, {config}));
+        render(createElement(App, {config}), preactRootElement);
         this.hostElement = hostElement;
     }
 

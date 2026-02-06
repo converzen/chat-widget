@@ -8,3 +8,50 @@
   all: initial; /* Reset inherited styles from the host site */
   font-family: sans-serif;
 }
+
+/* Custom scrollbar styles for light mode */
+.cvz-scrollbar-light::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cvz-scrollbar-light::-webkit-scrollbar-track {
+  background: #f3f4f6; /* gray-100 */
+}
+
+.cvz-scrollbar-light::-webkit-scrollbar-thumb {
+  background: #d1d5db; /* gray-300 */
+  border-radius: 4px;
+}
+
+.cvz-scrollbar-light::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af; /* gray-400 */
+}
+
+/* Custom scrollbar styles for dark mode */
+.cvz-scrollbar-dark::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cvz-scrollbar-dark::-webkit-scrollbar-track {
+  background: #111827; /* gray-900 */
+}
+
+.cvz-scrollbar-dark::-webkit-scrollbar-thumb {
+  background: #374151; /* gray-700 */
+  border-radius: 4px;
+}
+
+.cvz-scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background: #4b5563; /* gray-600 */
+}
+
+/* Firefox scrollbar styles */
+.cvz-scrollbar-light {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db #f3f4f6;
+}
+
+.cvz-scrollbar-dark {
+  scrollbar-width: thin;
+  scrollbar-color: #374151 #111827;
+}

@@ -1,5 +1,5 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
+import { createElement } from 'preact';
+import { render } from 'preact';
 import App from './App';
 // This import works because of the 'text' loader in tsup
 import tailwindStyles from './styles/global.css'; 
@@ -16,6 +16,5 @@ export function mountWidget(config: any) {
   const rootContainer = document.createElement('div');
   shadow.appendChild(rootContainer);
 
-  const root = createRoot(rootContainer);
-  root.render(<App config={config} />);
+  render(createElement(App, {config}), rootContainer);
 }

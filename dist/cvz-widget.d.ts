@@ -36,10 +36,12 @@ interface WidgetConfig {
         messages: ChatMessage[];
     }>;
     headerMsg?: string;
+    subheaderMsg?: string;
     initialGreeting?: string;
     promptPlaceholder?: string;
     chatUrl?: string;
     persona?: string;
+    darkMode?: boolean;
     style?: WidgetStyle;
     enableMarkdown?: boolean;
 }

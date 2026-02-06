@@ -12,12 +12,20 @@ export default defineConfig([
     outExtension: () => ({ js: '.js' }),
     clean: false, // Don't clean on second build
     minify: true,
+    treeshake: true,
     bundle: true,
     dts: true,
     noExternal: [/(.*)/],
     platform: 'browser',
     loader: {
       '.css': 'text',
+    },
+    esbuildOptions(options) {
+      // Alias react and react-dom to preact/compat for react-markdown compatibility
+      options.alias = {
+        'react': 'preact/compat',
+        'react-dom': 'preact/compat',
+      };
     },
   },
 ]);
