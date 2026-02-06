@@ -6,7 +6,7 @@ import { streamChatCompletion, streamChatContinuation } from './services/streami
 import ReactMarkdown from 'react-markdown';
 
 // --- Icons ---
-const CHAT_API_URL = 'https://chat.converzent.de';
+const DEFAULT_CHAT_API_URL = 'https://chat.converzent.de';
 
 // --- Style Helper Functions ---
 
@@ -430,7 +430,7 @@ const App: React.FC<AppProps> = ({ config }) => {
     try {
       // Get authentication token/key
       const auth = await getAuthToken(retryCount > 0); // Force refresh on retry
-      const baseUrl = config.chatUrl || CHAT_API_URL; // Defaults to 'https://chat.converzent.de'
+      const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL; // Defaults to 'https://chat.converzent.de'
       
       // Determine which endpoint to use based on sessionId
       const useCompletion = !sessionId;
