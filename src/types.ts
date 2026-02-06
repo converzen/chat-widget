@@ -5,11 +5,6 @@ export interface ChatMessage {
   sources?: string[]
 }
 
-export interface ChatResponse {
-  session_id?: string
-  response?: string
-  timestamp?: string
-}
 
 export interface StreamingData {
   type: 'token' | 'error' | 'done'

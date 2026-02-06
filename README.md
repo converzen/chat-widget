@@ -34,7 +34,7 @@ Perfect for static websites or quick integration. Just include the script tag:
   
   <!-- Initialize -->
   <script>
-    GMCWidget.init({
+    cvzWidget.init({
       apiKey: "your-api-key-here",
       headerMsg: "Chat with us",
       initialGreeting: "Hello! How can we help you?",
@@ -107,7 +107,7 @@ Then include the built file from `dist/cvz-widget.js` in your project.
 ### Basic Configuration
 
 ```javascript
-GMCWidget.init({
+cvzWidget.init({
   // Optional: API endpoint (optional, defaults to https://chat.converzent.de)
   chatUrl: "https://chat.converzent.de",
   
@@ -152,7 +152,7 @@ GMCWidget.init({
 Customize the widget appearance:
 
 ```javascript
-GMCWidget.init({
+cvzWidget.init({
   // ... other config
   style: {
     // Position: preset or custom
@@ -234,7 +234,7 @@ interface TokenResponse {
 ### Example 1: Simple Integration with API Key
 
 ```javascript
-GMCWidget.init({
+cvzWidget.init({
   chatUrl: "https://chat.converzent.de",
   apiKey: "sk_test_your_key",
   onSaveMessages: async (m) => console.log("Saving:", m),
@@ -245,7 +245,7 @@ GMCWidget.init({
 ### Example 2: Secure Integration with Backend
 
 ```javascript
-GMCWidget.init({
+cvzWidget.init({
   chatUrl: "https://chat.converzent.de",
   getToken: async () => {
     const res = await fetch('/api/auth/token');
@@ -271,7 +271,7 @@ GMCWidget.init({
 ### Example 3: Custom Styling
 
 ```javascript
-GMCWidget.init({
+cvzWidget.init({
   chatUrl: "https://chat.converzent.de",
   apiKey: "sk_test_...",
   style: {

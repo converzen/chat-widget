@@ -87,7 +87,7 @@ Once hosted, users can include:
 ```html
 <script src="https://cdn.converzent.de/chat-widget/latest/cvz-widget.js"></script>
 <script>
-  GMCWidget.init({
+  cvzWidget.init({
     chatUrl: "https://chat.converzent.de",
     apiKey: "your-api-key",
     onSaveMessages: async (m) => {},

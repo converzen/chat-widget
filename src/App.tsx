@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { WidgetConfig, WidgetStyle } from './index';
+import { WidgetConfig, WidgetStyle } from './index.markdown';
 import { ChatMessage } from './types';
 import { streamChatCompletion, streamChatContinuation } from './services/streaming';
+import ReactMarkdown from 'react-markdown';
 
 // --- Icons ---
 const CHAT_API_URL = 'https://chat.converzent.de';
@@ -158,7 +159,7 @@ const ChatHeader = ({
   </div>
 );
 
-// MessageContent component that conditionally renders markdown using dynamic imports
+// MessageContent component that renders markdown (static import for markdown build)
 const MessageContent = ({ 
   content, 
   enableMarkdown 
@@ -166,55 +167,31 @@ const MessageContent = ({
   content: string; 
   enableMarkdown?: boolean; 
 }) => {
-  const [MarkdownComponent, setMarkdownComponent] = useState<React.ComponentType<{ children: string }> | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (enableMarkdown && !MarkdownComponent && !isLoading) {
-      setIsLoading(true);
-      // Dynamically import react-markdown only when markdown is enabled
-      import('react-markdown').then((module) => {
-        const ReactMarkdown = module.default;
-        setMarkdownComponent(() => (props: { children: string }) => (
-          <div className="cvz-markdown-content">
-            <ReactMarkdown
-              components={{
-                p: ({ children }) => <p className="cvz-mb-2 cvz-last:cvz-mb-0">{children}</p>,
-                h1: ({ children }) => <h1 className="cvz-text-xl cvz-font-bold cvz-mb-2 cvz-mt-4 cvz-first:cvz-mt-0">{children}</h1>,
-                h2: ({ children }) => <h2 className="cvz-text-lg cvz-font-bold cvz-mb-2 cvz-mt-3 cvz-first:cvz-mt-0">{children}</h2>,
-                h3: ({ children }) => <h3 className="cvz-text-base cvz-font-bold cvz-mb-1 cvz-mt-2 cvz-first:cvz-mt-0">{children}</h3>,
-                ul: ({ children }) => <ul className="cvz-list-disc cvz-list-inside cvz-mb-2 cvz-space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol className="cvz-list-decimal cvz-list-inside cvz-mb-2 cvz-space-y-1">{children}</ol>,
-                li: ({ children }) => <li className="cvz-ml-2">{children}</li>,
-                code: ({ children }) => <code className="cvz-bg-gray-100 cvz-px-1 cvz-py-0.5 cvz-rounded cvz-text-sm cvz-font-mono">{children}</code>,
-                pre: ({ children }) => <pre className="cvz-bg-gray-100 cvz-p-2 cvz-rounded cvz-overflow-x-auto cvz-mb-2 cvz-text-sm cvz-font-mono">{children}</pre>,
-                blockquote: ({ children }) => <blockquote className="cvz-border-l-4 cvz-border-gray-300 cvz-pl-3 cvz-italic cvz-mb-2">{children}</blockquote>,
-                strong: ({ children }) => <strong className="cvz-font-bold">{children}</strong>,
-                em: ({ children }) => <em className="cvz-italic">{children}</em>,
-                a: ({ children, href }) => <a href={href} className="cvz-text-blue-600 cvz-underline cvz-hover:cvz-text-blue-800" target="_blank" rel="noopener noreferrer">{children}</a>,
-              }}
-            >
-              {props.children}
-            </ReactMarkdown>
-          </div>
-        ));
-        setIsLoading(false);
-      }).catch((error) => {
-        console.error('Failed to load react-markdown:', error);
-        setIsLoading(false);
-      });
-    }
-  }, [enableMarkdown, MarkdownComponent, isLoading]);
-
-  if (enableMarkdown && MarkdownComponent) {
-    return <MarkdownComponent>{content}</MarkdownComponent>;
+  if (enableMarkdown) {
+    return (
+      <div className="cvz-markdown-content">
+        <ReactMarkdown
+          components={{
+            p: ({ children }) => <p className="cvz-mb-2 cvz-last:cvz-mb-0">{children}</p>,
+            h1: ({ children }) => <h1 className="cvz-text-xl cvz-font-bold cvz-mb-2 cvz-mt-4 cvz-first:cvz-mt-0">{children}</h1>,
+            h2: ({ children }) => <h2 className="cvz-text-lg cvz-font-bold cvz-mb-2 cvz-mt-3 cvz-first:cvz-mt-0">{children}</h2>,
+            h3: ({ children }) => <h3 className="cvz-text-base cvz-font-bold cvz-mb-1 cvz-mt-2 cvz-first:cvz-mt-0">{children}</h3>,
+            ul: ({ children }) => <ul className="cvz-list-disc cvz-list-inside cvz-mb-2 cvz-space-y-1">{children}</ul>,
+            ol: ({ children }) => <ol className="cvz-list-decimal cvz-list-inside cvz-mb-2 cvz-space-y-1">{children}</ol>,
+            li: ({ children }) => <li className="cvz-ml-2">{children}</li>,
+            code: ({ children }) => <code className="cvz-bg-gray-100 cvz-px-1 cvz-py-0.5 cvz-rounded cvz-text-sm cvz-font-mono">{children}</code>,
+            pre: ({ children }) => <pre className="cvz-bg-gray-100 cvz-p-2 cvz-rounded cvz-overflow-x-auto cvz-mb-2 cvz-text-sm cvz-font-mono">{children}</pre>,
+            blockquote: ({ children }) => <blockquote className="cvz-border-l-4 cvz-border-gray-300 cvz-pl-3 cvz-italic cvz-mb-2">{children}</blockquote>,
+            strong: ({ children }) => <strong className="cvz-font-bold">{children}</strong>,
+            em: ({ children }) => <em className="cvz-italic">{children}</em>,
+            a: ({ children, href }) => <a href={href} className="cvz-text-blue-600 cvz-underline cvz-hover:cvz-text-blue-800" target="_blank" rel="noopener noreferrer">{children}</a>,
+          }}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
+    );
   }
-  
-  if (enableMarkdown && isLoading) {
-    // Show plain text while loading markdown library
-    return <>{content}</>;
-  }
-  
   return <>{content}</>;
 };
 
@@ -279,7 +256,7 @@ const ChatMessages = ({
                 : 'cvz-bg-white cvz-text-gray-800 cvz-border cvz-border-gray-100 cvz-rounded-bl-none'
             }`}
           >
-            {msg.content}
+            <MessageContent content={msg.content} enableMarkdown={enableMarkdown} />
           </div>
         </div>
       ))}
@@ -494,8 +471,6 @@ const App: React.FC<AppProps> = ({ config }) => {
           case 'session_continued':
             if (event.session_id) {
               setSessionId(event.session_id);
-              // Persist session ID to localStorage
-              localStorage.setItem('cvz-widget-session-id', event.session_id);
               console.log('Session ID:', event.session_id);
             }
             break;
@@ -509,7 +484,7 @@ const App: React.FC<AppProps> = ({ config }) => {
 
           case 'done':
             // Finalize the assistant message
-            if (accumulatedContent) {
+            if (accumulatedContent && sessionId) {
               const assistantMessage: ChatMessage = {
                 content: accumulatedContent,
                 role: 'ASSISTANT',
@@ -518,8 +493,7 @@ const App: React.FC<AppProps> = ({ config }) => {
               };
               const finalMessages = [...updatedMessages, assistantMessage];
               setMessages(finalMessages);
-              // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
-              await config.onSaveMessages(sessionId || '', finalMessages);
+              await config.onSaveMessages(sessionId, finalMessages);
             }
             setStreamingMessage('');
             setIsStreaming(false);
@@ -724,6 +698,7 @@ const App: React.FC<AppProps> = ({ config }) => {
           isStreaming={isStreaming}
           streamingMessage={streamingMessage}
           messagesEndRef={messagesEndRef}
+          enableMarkdown={config.enableMarkdown}
         />
 
         <ChatInput 

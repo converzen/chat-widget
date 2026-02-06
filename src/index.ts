@@ -4,6 +4,8 @@ import App from './App';
 import styles from './styles/output.css';
 import { ChatMessage } from "@/types";
 
+const HOST_ELEMENT_ID: string = 'cvz-widget-host'
+
 export interface TokenResponse {
   token: string;
   expiresAt?: number; // Unix timestamp in milliseconds, optional
@@ -46,40 +48,64 @@ export interface WidgetConfig {
   chatUrl?: string; // Optional - defaults to 'https://chat.converzent.de'
   persona?: string; // Optional persona identifier
   style?: WidgetStyle; // Optional styling customization
+  enableMarkdown?: boolean; // Optional - enable markdown rendering in messages (default: false). Requires markdown build.
 }
 
-let isInitialized = false;
+class WidgetManager {
+    private hostElement: HTMLDivElement | null = null;
 
-export function init(config: WidgetConfig) {
-  if (isInitialized) {
-    console.warn('GMCWidget is already initialized.');
-    return;
-  }
+    init(config: WidgetConfig) {
+        if (this.hostElement) {
+            console.warn('cvzWidget is already initialized.');
+            return;
+        }
 
-  console.log('Initializing GMCWidget...');
-  console.log('CSS Length:', styles.length); // Debug log
+        console.log('init: Initializing cvzWidget...');
+        console.log('CSS Length:', styles.length); // Debug log
 
-  // Create the host element
-  const hostElement = document.createElement('div');
-  hostElement.id = 'cvz-widget-host';
-  document.body.appendChild(hostElement);
+        // Create the host element
+        const hostElement = document.createElement('div');
+        hostElement.id = HOST_ELEMENT_ID;
+        document.body.appendChild(hostElement);
 
-  // Attach Shadow DOM
-  const shadowRoot = hostElement.attachShadow({ mode: 'open' });
 
-  // Inject Styles
-  const styleTag = document.createElement('style');
-  styleTag.textContent = styles;
-  shadowRoot.appendChild(styleTag);
+        // Attach Shadow DOM
+        const shadowRoot = hostElement.attachShadow({mode: 'open'});
 
-  // Create React Root
-  const reactRootElement = document.createElement('div');
-  reactRootElement.id = 'cvz-root';
-  shadowRoot.appendChild(reactRootElement);
+        // Inject Styles
+        const styleTag = document.createElement('style');
+        styleTag.textContent = styles;
+        shadowRoot.appendChild(styleTag);
 
-  // Render the App
-  const root = createRoot(reactRootElement);
-  root.render(React.createElement(App, { config }));
+        // Create React Root
+        const reactRootElement = document.createElement('div');
+        reactRootElement.id = 'cvz-root';
+        shadowRoot.appendChild(reactRootElement);
 
-  isInitialized = true;
+        // Render the App
+        const root = createRoot(reactRootElement);
+        root.render(React.createElement(App, {config}));
+        this.hostElement = hostElement;
+    }
+
+    // ... methods ...
+
+    hide() {
+        if (!this.hostElement) {
+            console.warn('destroy: cvzWidget is not initialized.');
+            return;
+        }
+
+        if (this.hostElement) {
+            this.hostElement.remove();
+            this.hostElement = null;
+        }
+    }
 }
+
+// Create the single instance here
+const cvzWidget = new WidgetManager();
+
+// Export it as the default
+export default cvzWidget;
+
