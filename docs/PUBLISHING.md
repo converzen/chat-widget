@@ -1,11 +1,11 @@
 # Publishing Guide
 
-This guide explains how to publish the ConverZent Chat Widget to npm, GitHub, and CDN.
+This guide explains how to publish the ConverZen Chat Widget to npm, GitHub, and CDN.
 
 ## Prerequisites
 
 1. **npm account**: Create an account at [npmjs.com](https://www.npmjs.com/)
-2. **GitHub repository**: Create a repository (e.g., `converzent/chat-widget`)
+2. **GitHub repository**: Create a repository (e.g., `converzen/chat-widget`)
 3. **CDN hosting**: Set up CDN or static file hosting
 
 ## 1. NPM Publishing
@@ -19,7 +19,7 @@ This guide explains how to publish the ConverZent Chat Widget to npm, GitHub, an
 
 2. **Verify package name is available**:
    ```bash
-   npm view @converzent/chat-widget
+   npm view @converzen/chat-widget
    ```
    If it returns 404, the name is available.
 
@@ -41,11 +41,11 @@ This guide explains how to publish the ConverZent Chat Widget to npm, GitHub, an
    ```bash
    npm publish --access public
    ```
-   (The `--access public` flag is required for scoped packages like `@converzent/...`)
+   (The `--access public` flag is required for scoped packages like `@converzen/...`)
 
 3. **Verify publication**:
    ```bash
-   npm view @converzent/chat-widget
+   npm view @converzen/chat-widget
    ```
 
 ### Updating
@@ -69,31 +69,31 @@ Once published, users can use via npm CDNs:
 
 ```html
 <!-- unpkg -->
-<script src="https://unpkg.com/@converzent/chat-widget@latest/dist/cvz-widget.js"></script>
+<script src="https://unpkg.com/@converzen/chat-widget@latest/dist/cvz-widget.js"></script>
 
 <!-- jsDelivr -->
-<script src="https://cdn.jsdelivr.net/npm/@converzent/chat-widget@latest/dist/cvz-widget.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@converzen/chat-widget@latest/dist/cvz-widget.js"></script>
 ```
 
 ## 2. GitHub Repository
 
 ### Initial Setup
 
-1. **Create repository** on GitHub (e.g., `converzent/chat-widget`)
+1. **Create repository** on GitHub (e.g., `converzen/chat-widget`)
 
 2. **Update package.json** (already done):
    ```json
    {
      "repository": {
        "type": "git",
-       "url": "https://github.com/converzent/chat-widget.git"
+       "url": "https://github.com/converzen/chat-widget.git"
      }
    }
    ```
 
 3. **Push to GitHub**:
    ```bash
-   git remote add origin https://github.com/converzent/chat-widget.git
+   git remote add origin https://github.com/converzen/chat-widget.git
    git branch -M main
    git push -u origin main
    ```
@@ -115,13 +115,13 @@ Once published, users can use via npm CDNs:
 If you upload `dist/cvz-widget.js` to releases:
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@v1.0.0/dist/cvz-widget.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/converzen/chat-widget@v1.0.0/dist/cvz-widget.js"></script>
 ```
 
 Or from main branch:
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@main/dist/cvz-widget.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/converzen/chat-widget@main/dist/cvz-widget.js"></script>
 ```
 
 ## 3. CDN Hosting
@@ -162,7 +162,7 @@ Or from main branch:
 
 4. **Users can access**:
    ```html
-   <script src="https://converzent.github.io/chat-widget/cvz-widget.js"></script>
+   <script src="https://converzen.github.io/chat-widget/cvz-widget.js"></script>
    ```
 
 ## Version Management
@@ -201,7 +201,7 @@ Follow [semver](https://semver.org/):
 
 ### npm: "Package name already exists"
 - Choose a different name, or
-- Use a scoped package: `@converzent/chat-widget`
+- Use a scoped package: `@converzen/chat-widget`
 
 ### npm: "You do not have permission"
 - Ensure you're logged in: `npm whoami`

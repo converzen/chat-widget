@@ -1,6 +1,6 @@
 # CDN Setup Guide
 
-This guide explains how to set up the ConverZent Chat Widget for CDN distribution.
+This guide explains how to set up the ConverZen Chat Widget for CDN distribution.
 
 ## Building for CDN
 
@@ -29,7 +29,7 @@ This creates `dist/cvz-widget.js` which can be hosted on any CDN or static file 
 2. Upload `dist/cvz-widget.js` as a release asset
 3. Users can use via jsDelivr:
    ```html
-   <script src="https://cdn.jsdelivr.net/gh/converzent/chat-widget@latest/dist/cvz-widget.js"></script>
+   <script src="https://cdn.jsdelivr.net/gh/converzen/chat-widget@latest/dist/cvz-widget.js"></script>
    ```
 
 ### Option 3: npm CDN (unpkg/jsDelivr)
@@ -38,10 +38,10 @@ If published to npm, users can use:
 
 ```html
 <!-- unpkg -->
-<script src="https://unpkg.com/@converzent/chat-widget@latest/dist/cvz-widget.js"></script>
+<script src="https://unpkg.com/@converzen/chat-widget@latest/dist/cvz-widget.js"></script>
 
 <!-- jsDelivr -->
-<script src="https://cdn.jsdelivr.net/npm/@converzent/chat-widget@latest/dist/cvz-widget.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@converzen/chat-widget@latest/dist/cvz-widget.js"></script>
 ```
 
 ## Versioning
@@ -50,13 +50,13 @@ For production use, pin to a specific version:
 
 ```html
 <!-- Pin to version 1.0.0 -->
-<script src="https://cdn.converzent.de/chat-widget/1.0.0/cvz-widget.js"></script>
+<script src="https://cdn.converzen.de/chat-widget/1.0.0/cvz-widget.js"></script>
 ```
 
 For latest (not recommended for production):
 
 ```html
-<script src="https://cdn.converzent.de/chat-widget/latest/cvz-widget.js"></script>
+<script src="https://cdn.converzen.de/chat-widget/latest/cvz-widget.js"></script>
 ```
 
 ## CDN Configuration
@@ -85,10 +85,10 @@ location /chat-widget/ {
 Once hosted, users can include:
 
 ```html
-<script src="https://cdn.converzent.de/chat-widget/latest/cvz-widget.js"></script>
+<script src="https://cdn.converzen.de/chat-widget/latest/cvz-widget.js"></script>
 <script>
   cvzWidget.init({
-    chatUrl: "https://chat.converzent.de",
+    chatUrl: "https://chat.converzen.de",
     apiKey: "your-api-key",
     onSaveMessages: async (m) => {},
     onLoadMessages: async () => []

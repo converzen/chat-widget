@@ -58,7 +58,7 @@ export interface WidgetConfig {
   subheaderMsg?: string; // Optional subheader text below the title (default: "We typically reply in a few minutes")
   initialGreeting?: string;
   promptPlaceholder?: string;
-  chatUrl?: string; // Optional - defaults to 'https://chat.converzent.de'
+  chatUrl?: string; // Optional - defaults to 'https://chat.converzen.de'
   persona?: string; // Optional persona identifier
   darkMode?: boolean; // Optional - enable dark mode theme (default: false)
   style?: WidgetStyle; // Optional styling customization
@@ -105,7 +105,7 @@ class WidgetManager {
 
     hide() {
         if (!this.hostElement) {
-            console.warn('destroy: cvzWidget is not initialized.');
+            console.warn('hide: cvzWidget is not initialized.');
             return;
         }
 

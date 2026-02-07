@@ -1,6 +1,6 @@
-# ConverZent Chat Widget
+# ConverZen Chat Widget
 
-A beautiful, customizable, and easy-to-integrate chat widget SDK for ConverZent. Supports streaming responses, session management, and full customization.
+A beautiful, customizable, and easy-to-integrate chat widget SDK for ConverZen. Supports streaming responses, session management, and full customization.
 
 ## Features
 
@@ -80,13 +80,13 @@ Perfect for static websites or quick integration. Just include the script tag:
 Best for projects using bundlers (Webpack, Vite, etc.):
 
 ```bash
-npm install @converzent/chat-widget
+npm install @converzen/chat-widget
 ```
 
 Then import and use:
 
 ```javascript
-import { init } from '@converzent/chat-widget';
+import { init } from '@converzen/chat-widget';
 
 init({
   apiKey: "your-api-key-here",
@@ -97,7 +97,7 @@ init({
 Or in TypeScript:
 
 ```typescript
-import { init, WidgetConfig } from '@converzent/chat-widget';
+import { init, WidgetConfig } from '@converzen/chat-widget';
 
 const config: WidgetConfig = {
   apiKey: "your-api-key-here",
@@ -113,7 +113,7 @@ init(config);
 For developers who want to customize or contribute:
 
 ```bash
-git clone https://github.com/converzent/chat-widget.git
+git clone https://github.com/converzen/chat-widget.git
 cd chat-widget
 npm install
 npm run build
@@ -127,8 +127,8 @@ Then include the built file from `dist/cvz-widget.js` in your project.
 
 ```javascript
 cvzWidget.init({
-  // Optional: API endpoint (optional, defaults to https://chat.converzent.de)
-  chatUrl: "https://chat.converzent.de",
+  // Optional: API endpoint (optional, defaults to https://chat.converzen.de)
+  chatUrl: "https://chat.converzen.de",
   
   // Authentication: Use either apiKey OR getToken (not both)
   apiKey: "sk_test_...", // For demo/insecure mode
@@ -136,7 +136,7 @@ cvzWidget.init({
   getToken: async () => {
     // For secure mode - keeps the api-key out of the client.
     // call your backend to get a JWT token
-    // The token can be retrieved from https://chat.converzent.de/api/get_token 
+    // The token can be retrieved from https://chat.converzen.de/api/get_token 
     // using your api-key. 
     // Your route should be secured by a login or recaptcha.
     const response = await fetch('/api/get-token');
@@ -216,7 +216,7 @@ getToken: async () => {
 
 | Option | Type | Required | Default | Description |
 |--------|------|----------|---------|-------------|
-| `chatUrl` | `string` | No | `"https://chat.converzent.de"` | API endpoint URL |
+| `chatUrl` | `string` | No | `"https://chat.converzen.de"` | API endpoint URL |
 | `apiKey` | `string` | No* | - | Direct API key (insecure/demo mode) |
 | `getToken` | `() => Promise<string \| TokenResponse>` | No* | - | Function to get JWT token |
 | `onSaveMessages` | `(messages: ChatMessage[]) => Promise<void>` | Yes | - | Save messages callback |
@@ -254,7 +254,7 @@ interface TokenResponse {
 
 ```javascript
 cvzWidget.init({
-  chatUrl: "https://chat.converzent.de",
+  chatUrl: "https://chat.converzen.de",
   apiKey: "sk_test_your_key",
   onSaveMessages: async (m) => console.log("Saving:", m),
   onLoadMessages: async () => [],
@@ -265,7 +265,7 @@ cvzWidget.init({
 
 ```javascript
 cvzWidget.init({
-  chatUrl: "https://chat.converzent.de",
+  chatUrl: "https://chat.converzen.de",
   getToken: async () => {
     const res = await fetch('/api/auth/token');
     const { token } = await res.json();
@@ -291,7 +291,7 @@ cvzWidget.init({
 
 ```javascript
 cvzWidget.init({
-  chatUrl: "https://chat.converzent.de",
+  chatUrl: "https://chat.converzen.de",
   apiKey: "sk_test_...",
   style: {
     position: 'bottom-left',
@@ -342,4 +342,4 @@ MIT
 
 ## Support
 
-For issues, questions, or contributions, please visit our [GitHub repository](https://github.com/converzent/chat-widget).
+For issues, questions, or contributions, please visit our [GitHub repository](https://github.com/converzen/chat-widget).

@@ -9,7 +9,7 @@ import { streamChatCompletion, streamChatContinuation } from './services/streami
 import ReactMarkdown from 'react-markdown';
 
 // --- Icons ---
-const DEFAULT_CHAT_API_URL = 'https://chat.converzent.de';
+const DEFAULT_CHAT_API_URL = 'https://chat.converzen.de';
 
 // --- Style Helper Functions ---
 
@@ -392,7 +392,7 @@ const ChatInput = ({
     <div className="cvz-text-center cvz-mt-2">
       <p className={`cvz-text-[10px] ${
         darkMode ? 'cvz-text-gray-500' : 'cvz-text-gray-400'
-      }`}>Powered by ConverZent</p>
+      }`}>Powered by ConverZen</p>
     </div>
   </form>
 );
@@ -509,7 +509,7 @@ const App = ({ config }: AppProps) => {
     try {
       // Get authentication token/key
       const auth = await getAuthToken(retryCount > 0); // Force refresh on retry
-      const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL; // Defaults to 'https://chat.converzent.de'
+      const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL; // Defaults to 'https://chat.converzen.de'
       
       // Track sessionId locally to avoid React state closure issues
       let currentSessionId = sessionId || '';

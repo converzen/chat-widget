@@ -1,7 +1,7 @@
 {
-  "name": "@converzent/chat-widget",
+  "name": "@converzen/chat-widget",
   "version": "1.0.0",
-  "description": "Drop-in chat widget SDK for ConverZent - Easy to integrate, customizable, and fully featured chat widget",
+  "description": "Drop-in chat widget SDK for ConverZen - Easy to integrate, customizable, and fully featured chat widget",
   "main": "./dist/cvz-widget.js",
   "browser": "./dist/cvz-widget.js",
   "exports": {
@@ -31,21 +31,21 @@
     "chat",
     "widget",
     "chatbot",
-    "converzent",
+    "converzen",
     "sdk",
     "react",
     "typescript"
   ],
-  "author": "ConverZent",
+  "author": "ConverZen",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/converzent/chat-widget.git"
+    "url": "https://github.com/converzen/chat-widget.git"
   },
   "bugs": {
-    "url": "https://github.com/converzent/chat-widget/issues"
+    "url": "https://github.com/converzen/chat-widget/issues"
   },
-  "homepage": "https://github.com/converzent/chat-widget#readme",
+  "homepage": "https://github.com/converzenF/chat-widget#readme",
   "devDependencies": {
     "@headlessui/react": "^1.7.0",
     "@heroicons/react": "^2.0.0",
