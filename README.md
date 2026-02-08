@@ -31,7 +31,7 @@ Perfect for static websites or quick integration. Just include the script tag:
   <!-- Include the widget -->
   <script
           async
-          src="https://converzen.de/widget/latest/cvz-widget-md.js"
+          src="https://converzen.de/widget/latest/cvz-widget.js"
           id="cvz-widget-script"
   ></script>
   
