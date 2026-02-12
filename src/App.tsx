@@ -734,14 +734,17 @@ const App = ({ config }: AppProps) => {
         abortControllerRef.current = null;
       }
       
-      setMessages([]);
+      setMessages([{
+          content: config.initialGreeting || DEFAULT_INITIAL_GREETING,
+          role: 'SYSTEM',
+          createdAt: new Date().toISOString(),
+      }]);
+
       setStreamingMessage('');
-      const currentSessionId = sessionId || '';
       setSessionId(null);
       setIsStreaming(false);
       setIsLoading(false);
       // Clear persisted session ID
-      localStorage.removeItem('cvz-widget-session-id');
       // Pass sessionId to onSaveMessages (empty string since we're clearing)
       await config.onSaveMessages('', []);
     }

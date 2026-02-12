@@ -106,25 +106,32 @@ export async function* streamChat(
     headers['Authorization'] = `Bearer ${authToken}`;
   }
 
+  // console.log(`sessionId: ${sessionId}`)
+
   // Build request body
   const body: Record<string, unknown> = {
     message,
   };
   
-  if (!sessionId && authType === 'apiKey' && persona) {
-    body.persona = persona;
+  if (!sessionId && (authType === 'apiKey') && persona) {
+      body.persona = persona;
   }
-  
+
+  if (sessionId) {
+      body.session = sessionId;
+  }
+
   if (maxTokens) {
     body.max_tokens = maxTokens;
   }
 
   let path;
   if (sessionId) {
-      path = '/api/chat/completion/stream'
-  } else {
       path = '/api/chat/continuation/stream'
+  } else {
+      path = '/api/chat/completion/stream'
   }
+
   // console.log(`sending request to ${baseUrl}${path} with body: ${JSON.stringify(body)}`);
   // Make fetch request
   const response = await fetch(`${baseUrl}${path}`, {
