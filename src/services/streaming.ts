@@ -1,24 +1,17 @@
 import { StreamingData } from '@/types';
 
-export interface StreamChatCompletionParams {
-  baseUrl: string;
-  message: string;
-  persona?: string;
-  authToken: string;
-  authType: 'apiKey' | 'bearer';
-  maxTokens?: number;
-  abortSignal?: AbortSignal;
+export interface StreamChatParams {
+    baseUrl: string;
+    sessionId?: string;
+    message: string;
+    persona?: string;
+    authToken: string;
+    authType: 'apiKey' | 'bearer';
+    maxTokens?: number;
+    abortSignal?: AbortSignal;
 }
 
-export interface StreamChatContinuationParams {
-  baseUrl: string;
-  sessionId: string;
-  message: string;
-  authToken: string;
-  authType: 'apiKey' | 'bearer';
-  maxTokens?: number;
-  abortSignal?: AbortSignal;
-}
+
 
 /**
  * Parse SSE stream and yield StreamingData events
@@ -94,10 +87,10 @@ function parseSSEBuffer(buffer: string): StreamingData[] {
 /**
  * Stream chat completion (new conversation)
  */
-export async function* streamChatCompletion(
-  params: StreamChatCompletionParams
+export async function* streamChat(
+  params: StreamChatParams
 ): AsyncGenerator<StreamingData, void, unknown> {
-  const { baseUrl, message, persona, authToken, authType, maxTokens, abortSignal } = params;
+  const { baseUrl, message, sessionId, persona, authToken, authType, maxTokens, abortSignal } = params;
   
   // Build headers
   const headers: Record<string, string> = {
@@ -105,6 +98,7 @@ export async function* streamChatCompletion(
     'Accept': 'text/event-stream',
   };
 
+  // console.log(`streamChat: using token type: ${authType}, sessionId: ${sessionId}`)
   // Set authentication header based on authType
   if (authType === 'apiKey') {
     headers['X-API-Key'] = authToken;
@@ -117,7 +111,7 @@ export async function* streamChatCompletion(
     message,
   };
   
-  if (persona) {
+  if (!sessionId && authType === 'apiKey' && persona) {
     body.persona = persona;
   }
   
@@ -125,9 +119,15 @@ export async function* streamChatCompletion(
     body.max_tokens = maxTokens;
   }
 
-  console.log("sending completion request: ", JSON.stringify(body));
+  let path;
+  if (sessionId) {
+      path = '/api/chat/completion/stream'
+  } else {
+      path = '/api/chat/continuation/stream'
+  }
+  // console.log(`sending request to ${baseUrl}${path} with body: ${JSON.stringify(body)}`);
   // Make fetch request
-  const response = await fetch(`${baseUrl}/api/chat/completion/stream`, {
+  const response = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -138,74 +138,6 @@ export async function* streamChatCompletion(
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
     try {
       console.error(`error from completion: ${response.status} : ${response.statusText}`)
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorData.detail || errorMessage;
-    } catch {
-      // Ignore JSON parse errors
-    }
-    
-    yield {
-      type: 'error',
-      detail: `${response.status} ${errorMessage}`, // Include status code for error detection
-    };
-    return;
-  }
-
-  if (!response.body) {
-    yield {
-      type: 'error',
-      detail: 'No response body received',
-    };
-    return;
-  }
-
-  // Parse SSE stream
-  const reader = response.body.getReader();
-  yield* parseSSEStream(reader);
-}
-
-/**
- * Stream chat continuation (continue existing session)
- */
-export async function* streamChatContinuation(
-  params: StreamChatContinuationParams
-): AsyncGenerator<StreamingData, void, unknown> {
-  const { baseUrl, sessionId, message, authToken, authType, maxTokens, abortSignal } = params;
-  
-  // Build headers
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Accept': 'text/event-stream',
-  };
-
-  // Set authentication header based on authType
-  if (authType === 'apiKey') {
-    headers['X-API-Key'] = authToken;
-  } else {
-    headers['Authorization'] = `Bearer ${authToken}`;
-  }
-
-  // Build request body
-  const body: Record<string, unknown> = {
-    session: sessionId,
-    message,
-  };
-  
-  if (maxTokens) {
-    body.max_tokens = maxTokens;
-  }
-
-  // Make fetch request
-  const response = await fetch(`${baseUrl}/api/chat/continuation/stream`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-    signal: abortSignal,
-  });
-
-  if (!response.ok) {
-    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-    try {
       const errorData = await response.json();
       errorMessage = errorData.message || errorData.detail || errorMessage;
     } catch {

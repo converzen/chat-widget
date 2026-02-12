@@ -1,11 +1,11 @@
 
 import { createElement } from 'preact';
-import { useState, useEffect, useRef, useLayoutEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ComponentChildren, RefObject } from 'preact';
 import type { CSSProperties } from 'preact/compat';
 import {TokenResponse, WidgetConfig, WidgetStyle} from './index';
 import { ChatMessage } from './types';
-import { streamChatCompletion, streamChatContinuation } from './services/streaming';
+import { streamChat } from './services/streaming';
 import ReactMarkdown from 'react-markdown';
 
 // --- Icons ---
@@ -432,18 +432,18 @@ const App = ({ config }: AppProps) => {
           initialMessages = result;
         }
 
+        // console.log(`loadHistory: sessionId: ${loadedSessionId}, messages: ${initialMessages.length} `)
+
         // Set session ID from loaded data, or fallback to localStorage
-        if (loadedSessionId) {
-          setSessionId(loadedSessionId);
-        } else {
+        if (!loadedSessionId) {
             initialMessages = [{
                 content: config.initialGreeting || DEFAULT_INITIAL_GREETING,
                 role: 'SYSTEM',
                 createdAt: new Date().toISOString(),
             }];
         }
+        setSessionId(loadedSessionId);
         setMessages(initialMessages);
-
       } catch (error) {
         console.error('Failed to load messages:', error);
       }
@@ -454,6 +454,7 @@ const App = ({ config }: AppProps) => {
 
   // Helper function to get auth token with caching
   const getAuthToken = async (forceRefresh = false): Promise<{ token: string; type: 'apiKey' | 'bearer' }> => {
+    // console.log(`getAuthToken: force: ${forceRefresh}`)
     if (config.apiKey) {
       return { token: config.apiKey, type: 'apiKey' };
     }
@@ -482,6 +483,7 @@ const App = ({ config }: AppProps) => {
     // TokenResponse with expiration
     const expiresAt = tokenResult.expiresAt;
     tokenCacheRef.current = { token: tokenResult.token, expiresAt };
+
     return { token: tokenResult.token, type: 'bearer' };
   };
 
@@ -493,40 +495,28 @@ const App = ({ config }: AppProps) => {
     retryCount = 0
   ): Promise<void> => {
     const maxRetries = 1; // Only retry once for token refresh
-    console.log("executeStreaming: started")
+    // console.log("executeStreaming: started")
     try {
       // Get authentication token/key
       const auth = await getAuthToken(retryCount > 0); // Force refresh on retry
+
       const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL; // Defaults to 'https://chat.converzen.de'
       
       // Track sessionId locally to avoid React state closure issues
       let currentSessionId = sessionId || '';
       
       // Determine which endpoint to use based on sessionId
-      const useCompletion = !currentSessionId;
-      
-      let streamGenerator;
-      if (useCompletion) {
-        streamGenerator = streamChatCompletion({
+      const streamGenerator = streamChat({
           baseUrl,
+          sessionId: currentSessionId,
           message: userMessage.content,
           persona: config.persona,
           authToken: auth.token,
           authType: auth.type,
           abortSignal: abortController.signal,
         });
-      } else {
-        streamGenerator = streamChatContinuation({
-          baseUrl,
-          sessionId: currentSessionId,
-          message: userMessage.content,
-          authToken: auth.token,
-          authType: auth.type,
-          abortSignal: abortController.signal,
-        });
-      }
 
-      console.log("executeStreaming: started streaming with session: ${currentSessionId}")
+      // console.log(`executeStreaming: started streaming with session: ${currentSessionId}`)
 
         // Process stream events
       let accumulatedContent = '';
@@ -539,7 +529,7 @@ const App = ({ config }: AppProps) => {
             break;
         }
 
-        console.log("executeStreaming: event received: {JSON.stringify(event)}");
+        // console.log(`executeStreaming: event received: ${JSON.stringify(event)}`);
 
         switch (event.type) {
           case 'session_created':
@@ -547,7 +537,7 @@ const App = ({ config }: AppProps) => {
             if (event.session_id && (event.session_id !== currentSessionId)) {
               currentSessionId = event.session_id;
               setSessionId(event.session_id);
-              console.log('Session ID:', event.session_id);
+              // console.log('Session ID:', event.session_id);
             }
             break;
 
@@ -574,7 +564,7 @@ const App = ({ config }: AppProps) => {
 
           case 'done':
             // Finalize the assistant message
-            console.log("received done event");
+            // console.log("received done event");
             if (accumulatedContent && currentSessionId) {
               // Set flag to prevent streaming message from rendering during finalization
               isFinalizingRef.current = true;
@@ -616,7 +606,7 @@ const App = ({ config }: AppProps) => {
                 config.getToken && 
                 !config.apiKey) {
               // Clear token cache and retry once
-              console.log('Unauthorized error detected, refreshing token and retrying...');
+              console.warn('Unauthorized error detected, refreshing token and retrying...');
               tokenCacheRef.current = null;
               hasUnauthorizedError = true;
               break; // Exit the loop to retry
@@ -643,7 +633,7 @@ const App = ({ config }: AppProps) => {
 
       // If we got an unauthorized error, retry once
       if (hasUnauthorizedError && retryCount < maxRetries) {
-          console.log("executeStreaming: retrying due to unauthorized error");
+          // console.log("executeStreaming: retrying due to unauthorized error");
           return executeStreaming(userMessage, updatedMessages, abortController, retryCount + 1);
       }
 
@@ -664,7 +654,7 @@ const App = ({ config }: AppProps) => {
           config.getToken && 
           !config.apiKey) {
         // Clear token cache and retry once
-        console.log('Unauthorized error detected, refreshing token and retrying...');
+        console.warn('Unauthorized error detected, refreshing token and retrying...');
         tokenCacheRef.current = null;
         return executeStreaming(userMessage, updatedMessages, abortController, retryCount + 1);
       }
