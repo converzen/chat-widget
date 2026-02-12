@@ -18,9 +18,10 @@ export {ChatMessage};
 
 const HOST_ELEMENT_ID: string = 'cvz-widget-host'
 
+
 export interface TokenResponse {
   token: string;
-  expiresAt?: number; // Unix timestamp in milliseconds, optional
+  expiresAt: number; // Unix timestamp in milliseconds, optional
 }
 
 export interface WidgetStyle {
@@ -51,7 +52,7 @@ export interface WidgetStyle {
 
 export interface WidgetConfig {
   apiKey?: string; // Direct API key (for insecure/demo mode) - uses X-API-Key header
-  getToken?: () => Promise<string | TokenResponse>; // Returns token string or TokenResponse with expiration
+  getToken?: () => Promise<TokenResponse>; // Returns token string or TokenResponse with expiration
   onSaveMessages: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
   onLoadMessages: () => Promise<{sessionId: string, messages: ChatMessage[]}>;
   headerMsg?: string;

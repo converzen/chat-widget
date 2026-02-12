@@ -7,7 +7,7 @@ export interface ChatMessage {
 
 
 export interface StreamingData {
-  type: 'token' | 'error' | 'done'
+  type: 'session_created' | 'session_continued' | 'token' | 'error' | 'done'
   content?: string
   session_id?: string
   sources?: string[]

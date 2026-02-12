@@ -3,14 +3,14 @@ import { createElement } from 'preact';
 import { useState, useEffect, useRef, useLayoutEffect } from 'preact/hooks';
 import type { ComponentChildren, RefObject } from 'preact';
 import type { CSSProperties } from 'preact/compat';
-import { WidgetConfig, WidgetStyle } from './index';
+import {TokenResponse, WidgetConfig, WidgetStyle} from './index';
 import { ChatMessage } from './types';
 import { streamChatCompletion, streamChatContinuation } from './services/streaming';
 import ReactMarkdown from 'react-markdown';
 
 // --- Icons ---
 const DEFAULT_CHAT_API_URL = 'https://chat.converzen.de';
-
+const DEFAULT_INITIAL_GREETING: string = "Hi, how can I help you ?"
 // --- Style Helper Functions ---
 
 const getPositionStyles = (style?: WidgetStyle): CSSProperties => {
@@ -198,30 +198,30 @@ const MessageContent = ({
       <div className="cvz-markdown-content">
         <ReactMarkdown
           components={{
-            p: ({ children }: { children: ReactNode }) => <p className={`cvz-mb-2 cvz-last:cvz-mb-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</p>,
-            h1: ({ children }: { children: ReactNode }) => <h1 className={`cvz-text-xl cvz-font-bold cvz-mb-2 cvz-mt-4 cvz-first:cvz-mt-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</h1>,
-            h2: ({ children }: { children: ReactNode }) => <h2 className={`cvz-text-lg cvz-font-bold cvz-mb-2 cvz-mt-3 cvz-first:cvz-mt-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</h2>,
-            h3: ({ children }: { children: ReactNode }) => <h3 className={`cvz-text-base cvz-font-bold cvz-mb-1 cvz-mt-2 cvz-first:cvz-mt-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</h3>,
-            ul: ({ children }: { children: ReactNode }) => <ul className={`cvz-list-disc cvz-list-inside cvz-mb-2 cvz-space-y-1 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</ul>,
-            ol: ({ children }: { children: ReactNode }) => <ol className={`cvz-list-decimal cvz-list-inside cvz-mb-2 cvz-space-y-1 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</ol>,
-            li: ({ children }: { children: ReactNode }) => <li className="cvz-ml-2">{children}</li>,
-            code: ({ children }: { children: ReactNode }) => <code className={`cvz-px-1 cvz-py-0.5 cvz-rounded cvz-text-sm cvz-font-mono ${
+            p: ({ children }: any) => <p className={`cvz-mb-2 cvz-last:cvz-mb-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</p>,
+            h1: ({ children }: any) => <h1 className={`cvz-text-xl cvz-font-bold cvz-mb-2 cvz-mt-4 cvz-first:cvz-mt-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</h1>,
+            h2: ({ children }: any) => <h2 className={`cvz-text-lg cvz-font-bold cvz-mb-2 cvz-mt-3 cvz-first:cvz-mt-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</h2>,
+            h3: ({ children }: any) => <h3 className={`cvz-text-base cvz-font-bold cvz-mb-1 cvz-mt-2 cvz-first:cvz-mt-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</h3>,
+            ul: ({ children }: any) => <ul className={`cvz-list-disc cvz-list-inside cvz-mb-2 cvz-space-y-1 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</ul>,
+            ol: ({ children }: any) => <ol className={`cvz-list-decimal cvz-list-inside cvz-mb-2 cvz-space-y-1 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</ol>,
+            li: ({ children }: any) => <li className="cvz-ml-2">{children}</li>,
+            code: ({ children }: any) => <code className={`cvz-px-1 cvz-py-0.5 cvz-rounded cvz-text-sm cvz-font-mono ${
               darkMode ? 'cvz-bg-gray-700 cvz-text-gray-100' : 'cvz-bg-gray-100'
             }`}>{children}</code>,
-            pre: ({ children }: { children: ReactNode }) => <pre className={`cvz-p-2 cvz-rounded cvz-overflow-x-auto cvz-mb-2 cvz-text-sm cvz-font-mono ${
+            pre: ({ children }: any) => <pre className={`cvz-p-2 cvz-rounded cvz-overflow-x-auto cvz-mb-2 cvz-text-sm cvz-font-mono ${
               darkMode ? 'cvz-bg-gray-700 cvz-text-gray-100' : 'cvz-bg-gray-100'
             }`}>{children}</pre>,
-            blockquote: ({ children }: { children: ReactNode }) => <blockquote className={`cvz-border-l-4 cvz-pl-3 cvz-italic cvz-mb-2 ${
+            blockquote: ({ children }: any) => <blockquote className={`cvz-border-l-4 cvz-pl-3 cvz-italic cvz-mb-2 ${
               darkMode ? 'cvz-border-gray-600 cvz-text-gray-300' : 'cvz-border-gray-300'
             }`}>{children}</blockquote>,
-            strong: ({ children }: { children: ReactNode }) => <strong className="cvz-font-bold">{children}</strong>,
-            em: ({ children }: { children: ReactNode }) => <em className="cvz-italic">{children}</em>,
-            a: ({ children, href }: { children: ReactNode; href?: string }) => <a href={href} className={`cvz-underline ${
+            strong: ({ children }: any) => <strong className="cvz-font-bold">{children}</strong>,
+            em: ({ children }: any) => <em className="cvz-italic">{children}</em>,
+            a: ({ children, href }: any) => <a href={href} className={`cvz-underline ${
               darkMode 
                 ? 'cvz-text-blue-400 cvz-hover:cvz-text-blue-300' 
                 : 'cvz-text-blue-600 cvz-hover:cvz-text-blue-800'
             }`} target="_blank" rel="noopener noreferrer">{children}</a>,
-          }}
+          } as any}
         >
           {content}
         </ReactMarkdown>
@@ -407,10 +407,13 @@ const App = ({ config }: AppProps) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const tokenCacheRef = useRef<{ token: string; expiresAt: number | null } | null>(null);
+  const tokenCacheRef = useRef<TokenResponse  | null>(null);
   const isFinalizingRef = useRef(false);
+  const streamBufferRef = useRef("");
+  const rAFRef = useRef<number | null>(null);
 
   // Load messages and session ID on mount
   useEffect(() => {
@@ -424,32 +427,23 @@ const App = ({ config }: AppProps) => {
         if (result && typeof result === 'object' && 'messages' in result && 'sessionId' in result) {
           initialMessages = result.messages || [];
           loadedSessionId = result.sessionId || null;
-        } else if (Array.isArray(result) && result.length > 0) {
+        } else if (Array.isArray(result)) {
           // Fallback for backward compatibility (if someone returns just an array)
           initialMessages = result;
         }
 
-        // If no messages loaded and we have an initial greeting, use it
-        if (initialMessages.length === 0 && config.initialGreeting) {
-          initialMessages = [{
-            content: config.initialGreeting,
-            role: 'SYSTEM',
-            createdAt: new Date().toISOString(),
-          }];
-        }
-
-        setMessages(initialMessages);
-        
         // Set session ID from loaded data, or fallback to localStorage
         if (loadedSessionId) {
           setSessionId(loadedSessionId);
-          localStorage.setItem('cvz-widget-session-id', loadedSessionId);
         } else {
-          const savedSessionId = localStorage.getItem('cvz-widget-session-id');
-          if (savedSessionId) {
-            setSessionId(savedSessionId);
-          }
+            initialMessages = [{
+                content: config.initialGreeting || DEFAULT_INITIAL_GREETING,
+                role: 'SYSTEM',
+                createdAt: new Date().toISOString(),
+            }];
         }
+        setMessages(initialMessages);
+
       } catch (error) {
         console.error('Failed to load messages:', error);
       }
@@ -470,7 +464,7 @@ const App = ({ config }: AppProps) => {
 
     // Check token cache first (unless forcing refresh)
     if (!forceRefresh) {
-      const now = Date.now();
+      const now = Date.now() / 1000 + 5; // unix EPOCH seconds value + 5 seconds overlap
       const cached = tokenCacheRef.current;
       const isTokenValid = cached && (
         cached.expiresAt === null || // No expiration - always valid
@@ -485,16 +479,10 @@ const App = ({ config }: AppProps) => {
     // Fetch new token
     const tokenResult = await config.getToken();
     
-    if (typeof tokenResult === 'string') {
-      // Simple string token - no expiration, cache it
-      tokenCacheRef.current = { token: tokenResult, expiresAt: null };
-      return { token: tokenResult, type: 'bearer' };
-    } else {
-      // TokenResponse with expiration
-      const expiresAt = tokenResult.expiresAt || null;
-      tokenCacheRef.current = { token: tokenResult.token, expiresAt };
-      return { token: tokenResult.token, type: 'bearer' };
-    }
+    // TokenResponse with expiration
+    const expiresAt = tokenResult.expiresAt;
+    tokenCacheRef.current = { token: tokenResult.token, expiresAt };
+    return { token: tokenResult.token, type: 'bearer' };
   };
 
   // Helper function to execute streaming with retry on auth errors
@@ -505,7 +493,7 @@ const App = ({ config }: AppProps) => {
     retryCount = 0
   ): Promise<void> => {
     const maxRetries = 1; // Only retry once for token refresh
-    
+    console.log("executeStreaming: started")
     try {
       // Get authentication token/key
       const auth = await getAuthToken(retryCount > 0); // Force refresh on retry
@@ -538,39 +526,55 @@ const App = ({ config }: AppProps) => {
         });
       }
 
-      // Process stream events
+      console.log("executeStreaming: started streaming with session: ${currentSessionId}")
+
+        // Process stream events
       let accumulatedContent = '';
       let hasUnauthorizedError = false;
       
       for await (const event of streamGenerator) {
         // Check if stream was aborted
         if (abortController.signal.aborted) {
-          break;
+            console.log("executeStreaming: abort signal received")
+            break;
         }
+
+        console.log("executeStreaming: event received: {JSON.stringify(event)}");
 
         switch (event.type) {
           case 'session_created':
           case 'session_continued':
-            if (event.session_id) {
+            if (event.session_id && (event.session_id !== currentSessionId)) {
               currentSessionId = event.session_id;
               setSessionId(event.session_id);
-              localStorage.setItem('cvz-widget-session-id', event.session_id);
               console.log('Session ID:', event.session_id);
             }
             break;
 
           case 'token':
             if (event.content) {
+              streamBufferRef.current += event.content;
               accumulatedContent += event.content;
-              // Use requestAnimationFrame to ensure Preact processes the state update
-              requestAnimationFrame(() => {
-                setStreamingMessage(accumulatedContent);
-              });
+
+                if (!rAFRef.current) {
+                    rAFRef.current = requestAnimationFrame(() => {
+                        const newText = streamBufferRef.current;
+
+                        setStreamingMessage((prev) => {
+                            return prev + newText;
+                        });
+
+                        // 3. Reset the buffer and the rAF handle
+                        streamBufferRef.current = "";
+                        rAFRef.current = null;
+                    });
+                }
             }
             break;
 
           case 'done':
             // Finalize the assistant message
+            console.log("received done event");
             if (accumulatedContent && currentSessionId) {
               // Set flag to prevent streaming message from rendering during finalization
               isFinalizingRef.current = true;
@@ -639,7 +643,8 @@ const App = ({ config }: AppProps) => {
 
       // If we got an unauthorized error, retry once
       if (hasUnauthorizedError && retryCount < maxRetries) {
-        return executeStreaming(userMessage, updatedMessages, abortController, retryCount + 1);
+          console.log("executeStreaming: retrying due to unauthorized error");
+          return executeStreaming(userMessage, updatedMessages, abortController, retryCount + 1);
       }
 
       // If we exit the loop without a 'done' event, something went wrong
@@ -667,6 +672,8 @@ const App = ({ config }: AppProps) => {
       throw error; // Re-throw if not a retryable auth error
     }
   };
+
+
 
   const handleSendMessage = async (e?: Event) => {
     e?.preventDefault();
