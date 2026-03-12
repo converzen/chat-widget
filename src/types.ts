@@ -6,12 +6,16 @@ export interface ChatMessage {
 }
 
 
+export type StreamErrorCode = 'session_expired' | 'auth_failed' | 'unavailable' | 'content_filtered' | 'internal'
+
 export interface StreamingData {
   type: 'session_created' | 'session_continued' | 'token' | 'error' | 'done'
   content?: string
   session_id?: string
   sources?: string[]
   detail?: string
+  message?: string
+  code?: StreamErrorCode
 }
 
 export interface ChatModalConfig {

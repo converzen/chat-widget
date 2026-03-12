@@ -599,23 +599,22 @@ const App = ({ config }: AppProps) => {
             return;
 
           case 'error':
-            // Check if it's an unauthorized error (401 or 403)
-            const errorMsg = event.detail || '';
-            if ((errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('Unauthorized') || errorMsg.includes('Forbidden')) && 
+            const errorCode = event.code || '';
+            const errorMsg = event.message || event.detail || '';
+
+            if ((errorCode === 'auth_failed' || errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('Unauthorized') || errorMsg.includes('Forbidden')) && 
                 retryCount < maxRetries && 
                 config.getToken && 
                 !config.apiKey) {
-              // Clear token cache and retry once
-              console.warn('Unauthorized error detected, refreshing token and retrying...');
+              console.warn('Auth error detected, refreshing token and retrying...');
               tokenCacheRef.current = null;
               hasUnauthorizedError = true;
-              break; // Exit the loop to retry
+              break;
             }
             
-            // Show error message to user
-            console.error('Stream error:', errorMsg);
+            console.error('Stream error:', errorCode, errorMsg);
             const errorMessage: ChatMessage = {
-              content: `Error: ${errorMsg || 'An error occurred'}`,
+              content: errorMsg || 'An error occurred',
               role: 'SYSTEM',
               createdAt: new Date().toISOString(),
             };
