@@ -13,7 +13,6 @@ export interface StreamingData {
   content?: string
   session_id?: string
   sources?: string[]
-  detail?: string
   message?: string
   code?: StreamErrorCode
 }

@@ -19,7 +19,7 @@ export interface StreamChatParams {
 async function* parseSSEStream(reader: ReadableStreamDefaultReader<Uint8Array>): AsyncGenerator<StreamingData, void, unknown> {
   const decoder = new TextDecoder();
   let buffer = '';
-
+  let eventCount = 0;
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -29,6 +29,7 @@ async function* parseSSEStream(reader: ReadableStreamDefaultReader<Uint8Array>):
         if (buffer.trim()) {
           const events = parseSSEBuffer(buffer);
           for (const event of events) {
+              eventCount += 1;
             yield event;
           }
         }
@@ -48,6 +49,7 @@ async function* parseSSEStream(reader: ReadableStreamDefaultReader<Uint8Array>):
           if (data) {
             try {
               const parsed = JSON.parse(data) as StreamingData;
+              eventCount += 1;
               yield parsed;
             } catch (e) {
               console.error('Failed to parse SSE data:', data, e);
@@ -58,6 +60,7 @@ async function* parseSSEStream(reader: ReadableStreamDefaultReader<Uint8Array>):
     }
   } finally {
     reader.releaseLock();
+    console.log(`parseSSEStream: yielded ${eventCount} events`)
   }
 }
 
@@ -146,14 +149,14 @@ export async function* streamChat(
     try {
       console.error(`error from completion: ${response.status} : ${response.statusText}`)
       const errorData = await response.json();
-      errorMessage = errorData.message || errorData.detail || errorMessage;
+      errorMessage = errorData.message || errorMessage;
     } catch {
       // Ignore JSON parse errors
     }
     
     yield {
       type: 'error',
-      detail: `${response.status} ${errorMessage}`, // Include status code for error detection
+      message: `${response.status} ${errorMessage}`, // Include status code for error detection
     };
     return;
   }
@@ -161,7 +164,7 @@ export async function* streamChat(
   if (!response.body) {
     yield {
       type: 'error',
-      detail: 'No response body received',
+      message: 'No response body received',
     };
     return;
   }

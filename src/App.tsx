@@ -43,28 +43,32 @@ const getPositionStyles = (style?: WidgetStyle): CSSProperties => {
   }
 };
 
+const DIALOG_MAX_WIDTH = 'calc(100vw - 2rem)';
+const DIALOG_MAX_HEIGHT = 'calc(100dvh - 8rem)';
+
 const getDialogSize = (style?: WidgetStyle): CSSProperties => {
+  const responsive = { maxWidth: DIALOG_MAX_WIDTH, maxHeight: DIALOG_MAX_HEIGHT };
+
   if (!style?.dialogSize) {
-    return { width: '350px', height: '500px' }; // Default: medium
+    return { width: '350px', height: '500px', ...responsive };
   }
 
   if (typeof style.dialogSize === 'string') {
-    // Preset sizes
     switch (style.dialogSize) {
       case 'small':
-        return { width: '300px', height: '400px' };
+        return { width: '300px', height: '400px', ...responsive };
       case 'medium':
-        return { width: '350px', height: '500px' };
+        return { width: '350px', height: '500px', ...responsive };
       case 'large':
-        return { width: '400px', height: '600px' };
+        return { width: '400px', height: '600px', ...responsive };
       default:
-        return { width: '350px', height: '500px' };
+        return { width: '350px', height: '500px', ...responsive };
     }
   } else {
-    // Custom size
     return {
-      width: `${Math.max(250, style.dialogSize.width)}px`, // Minimum 250px width
-      height: `${Math.max(300, style.dialogSize.height)}px`, // Minimum 300px height
+      width: `${Math.max(250, style.dialogSize.width)}px`,
+      height: `${Math.max(300, style.dialogSize.height)}px`,
+      ...responsive,
     };
   }
 };
@@ -235,6 +239,7 @@ const ChatMessages = ({
   messages, 
   isStreaming,
   streamingMessage,
+  isFinalizingRef,
   messagesEndRef,
   enableMarkdown,
   darkMode
@@ -242,6 +247,7 @@ const ChatMessages = ({
   messages: ChatMessage[];
   isStreaming: boolean;
   streamingMessage: string;
+  isFinalizingRef: RefObject<boolean>;
   messagesEndRef: RefObject<HTMLDivElement>;
   enableMarkdown?: boolean;
   darkMode?: boolean;
@@ -369,7 +375,7 @@ const ChatInput = ({
       <input
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange((e.target as HTMLInputElement).value)}
         placeholder={placeholder}
         className={`cvz-w-full cvz-border cvz-text-sm cvz-rounded-full cvz-pl-4 cvz-pr-12 cvz-py-3 cvz-focus:cvz-outline-none cvz-focus:cvz-ring-1 cvz-transition-all ${
           darkMode
@@ -803,6 +809,7 @@ const App = ({ config }: AppProps) => {
           messages={messages} 
           isStreaming={isStreaming}
           streamingMessage={streamingMessage}
+          isFinalizingRef={isFinalizingRef}
           messagesEndRef={messagesEndRef}
           enableMarkdown={config.enableMarkdown}
           darkMode={config.darkMode}
