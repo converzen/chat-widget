@@ -7,6 +7,7 @@ import {TokenResponse, WidgetConfig, WidgetStyle} from './index';
 import { ChatMessage } from './types';
 import { streamChat } from './services/streaming';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // --- Icons ---
 const DEFAULT_CHAT_API_URL = 'https://chat.converzen.de';
@@ -201,6 +202,7 @@ const MessageContent = ({
     return (
       <div className="cvz-markdown-content">
         <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
           components={{
             p: ({ children }: any) => <p className={`cvz-mb-2 cvz-last:cvz-mb-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</p>,
             h1: ({ children }: any) => <h1 className={`cvz-text-xl cvz-font-bold cvz-mb-2 cvz-mt-4 cvz-first:cvz-mt-0 ${darkMode ? 'cvz-text-gray-100' : ''}`}>{children}</h1>,
@@ -225,6 +227,26 @@ const MessageContent = ({
                 ? 'cvz-text-blue-400 cvz-hover:cvz-text-blue-300' 
                 : 'cvz-text-blue-600 cvz-hover:cvz-text-blue-800'
             }`} target="_blank" rel="noopener noreferrer">{children}</a>,
+            table: ({ children }: any) => (
+              <div className="cvz-overflow-x-auto cvz-mb-2">
+                <table className={`cvz-w-full cvz-text-sm cvz-border-collapse ${
+                  darkMode ? 'cvz-text-gray-100' : ''
+                }`}>{children}</table>
+              </div>
+            ),
+            thead: ({ children }: any) => <thead className={`${
+              darkMode ? 'cvz-bg-gray-700' : 'cvz-bg-gray-100'
+            }`}>{children}</thead>,
+            tbody: ({ children }: any) => <tbody>{children}</tbody>,
+            tr: ({ children }: any) => <tr className={`cvz-border-b ${
+              darkMode ? 'cvz-border-gray-600' : 'cvz-border-gray-200'
+            }`}>{children}</tr>,
+            th: ({ children }: any) => <th className={`cvz-px-3 cvz-py-1.5 cvz-text-left cvz-font-semibold cvz-border ${
+              darkMode ? 'cvz-border-gray-600' : 'cvz-border-gray-300'
+            }`}>{children}</th>,
+            td: ({ children }: any) => <td className={`cvz-px-3 cvz-py-1.5 cvz-border ${
+              darkMode ? 'cvz-border-gray-600' : 'cvz-border-gray-300'
+            }`}>{children}</td>,
           } as any}
         >
           {content}
