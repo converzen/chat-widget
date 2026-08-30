@@ -227,6 +227,7 @@ getToken: async () => {
 | `sessionId` | `string` | No | - | Continue existing session |
 | `persona` | `string` | No | - | Persona identifier |
 | `style` | `WidgetStyle` | No | - | Styling customization |
+| `icons` | `WidgetIcons` | No | - | Icon overrides |
 
 *Either `apiKey` or `getToken` must be provided.
 
@@ -238,6 +239,29 @@ getToken: async () => {
 | `dialogSize` | `'small' \| 'medium' \| 'large' \| { width: number, height: number }` | Dialog dimensions |
 | `frameColor` | `string` | Border color (hex code) |
 | `buttonColor` | `{ normal?: string, hover?: string, open?: string }` | Button colors (hex codes) |
+
+### `WidgetIcons`
+
+Each field is raw SVG (or other inline HTML) markup that replaces the corresponding built-in icon. Use `stroke="currentColor"` / `fill="currentColor"` in your markup so the icon inherits the surrounding color the same way the built-in icons do (e.g. the launcher button's white icon color).
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `launcher` | `string` | Closed launcher-button icon; also used for the empty-conversation placeholder |
+| `close` | `string` | Open launcher-button icon and the header's close-chat icon |
+| `send` | `string` | Message input's send-button icon |
+| `clear` | `string` | Header's clear-history icon |
+
+```javascript
+cvzWidget.init({
+  // ...
+  icons: {
+    launcher: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="..."/></svg>',
+    send: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="..."/></svg>',
+  },
+});
+```
+
+Any icon left unset keeps the default built-in icon.
 
 ### `TokenResponse`
 

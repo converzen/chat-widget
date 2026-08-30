@@ -50,6 +50,16 @@ export interface WidgetStyle {
   };
 }
 
+export interface WidgetIcons {
+  // Raw SVG (or other inline HTML) markup, inserted in place of the built-in icon.
+  // Use `stroke="currentColor"` / `fill="currentColor"` in your markup to inherit
+  // the surrounding icon color the same way the built-in icons do.
+  launcher?: string; // Closed launcher-button icon; also used for the empty-conversation placeholder
+  close?: string;    // Open launcher-button icon and the header's close-chat icon
+  send?: string;     // Message input's send-button icon
+  clear?: string;    // Header's clear-history icon
+}
+
 export interface WidgetConfig {
   apiKey?: string; // Direct API key (for insecure/demo mode) - uses X-API-Key header
   getToken?: () => Promise<TokenResponse>; // Returns token string or TokenResponse with expiration
@@ -63,6 +73,7 @@ export interface WidgetConfig {
   persona?: string; // Optional persona identifier
   darkMode?: boolean; // Optional - enable dark mode theme (default: false)
   style?: WidgetStyle; // Optional styling customization
+  icons?: WidgetIcons; // Optional icon overrides (default: built-in outline icon set)
   enableMarkdown?: boolean; // Optional - enable markdown rendering in messages (default: false). Requires markdown build.
 }
 

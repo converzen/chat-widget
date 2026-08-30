@@ -3,7 +3,7 @@ import { createElement } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ComponentChildren, RefObject } from 'preact';
 import type { CSSProperties } from 'preact/compat';
-import {TokenResponse, WidgetConfig, WidgetStyle} from './index';
+import {TokenResponse, WidgetConfig, WidgetStyle, WidgetIcons} from './index';
 import { ChatMessage } from './types';
 import { streamChat } from './services/streaming';
 import ReactMarkdown from 'react-markdown';
@@ -117,6 +117,14 @@ const TrashIcon = () => (
   </svg>
 );
 
+// Renders a consumer-supplied icon override (raw SVG/HTML markup) in place of a
+// built-in icon component, preserving the built-in's sizing when no override is given.
+const IconSlot = ({ custom, fallback, className }: { custom?: string; fallback: ComponentChildren; className: string }) => (
+  custom
+    ? <span className={className} dangerouslySetInnerHTML={{ __html: custom }} />
+    : fallback
+);
+
 // --- Types ---
 
 
@@ -129,18 +137,20 @@ type ReactNode = ComponentChildren;
 
 // --- Components ---
 
-const ChatHeader = ({ 
-  title, 
-  subtitle, 
-  onClose, 
+const ChatHeader = ({
+  title,
+  subtitle,
+  onClose,
   onClear,
-  darkMode
-}: { 
-  title: string; 
-  subtitle?: string; 
-  onClose: () => void; 
+  darkMode,
+  icons
+}: {
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
   onClear: () => void;
   darkMode?: boolean;
+  icons?: WidgetIcons;
 }) => (
   <div className={`cvz-p-4 cvz-shadow-md cvz-flex cvz-justify-between cvz-items-start ${
     darkMode 
@@ -171,18 +181,18 @@ const ChatHeader = ({
         }`}
         title="Clear History"
       >
-        <TrashIcon />
+        <IconSlot custom={icons?.clear} fallback={<TrashIcon />} className="cvz-w-5 cvz-h-5" />
       </button>
-      <button 
+      <button
         onClick={onClose}
         className={`cvz-transition-colors cvz-p-1 cvz-rounded-md ${
-          darkMode 
-            ? 'cvz-text-gray-400 cvz-hover:cvz-text-white cvz-hover:cvz-bg-gray-700/50' 
+          darkMode
+            ? 'cvz-text-gray-400 cvz-hover:cvz-text-white cvz-hover:cvz-bg-gray-700/50'
             : 'cvz-text-blue-200 cvz-hover:cvz-text-white cvz-hover:cvz-bg-blue-600/50'
         }`}
         title="Close Chat"
       >
-        <XMarkIcon />
+        <IconSlot custom={icons?.close} fallback={<XMarkIcon />} className="cvz-w-6 cvz-h-6" />
       </button>
     </div>
   </div>
@@ -257,15 +267,16 @@ const MessageContent = ({
   return createElement('span', null, content);
 };
 
-const ChatMessages = ({ 
-  messages, 
+const ChatMessages = ({
+  messages,
   isStreaming,
   streamingMessage,
   isFinalizingRef,
   messagesEndRef,
   enableMarkdown,
-  darkMode
-}: { 
+  darkMode,
+  icons
+}: {
   messages: ChatMessage[];
   isStreaming: boolean;
   streamingMessage: string;
@@ -273,6 +284,7 @@ const ChatMessages = ({
   messagesEndRef: RefObject<HTMLDivElement>;
   enableMarkdown?: boolean;
   darkMode?: boolean;
+  icons?: WidgetIcons;
 }) => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -312,7 +324,7 @@ const ChatMessages = ({
         <div className={`cvz-flex cvz-flex-col cvz-items-center cvz-justify-center cvz-h-full cvz-space-y-2 ${
           darkMode ? 'cvz-text-gray-500' : 'cvz-text-gray-400'
         }`}>
-          <ChatIcon />
+          <IconSlot custom={icons?.launcher} fallback={<ChatIcon />} className="cvz-w-6 cvz-h-6" />
           <p className="cvz-text-sm">Start a conversation</p>
         </div>
       )}
@@ -373,20 +385,22 @@ const ChatMessages = ({
   );
 };
 
-const ChatInput = ({ 
-  value, 
-  onChange, 
-  onSubmit, 
-  isLoading, 
+const ChatInput = ({
+  value,
+  onChange,
+  onSubmit,
+  isLoading,
   placeholder,
-  darkMode
-}: { 
-  value: string; 
-  onChange: (val: string) => void; 
-  onSubmit: (e?: Event) => void; 
-  isLoading: boolean; 
+  darkMode,
+  icons
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  onSubmit: (e?: Event) => void;
+  isLoading: boolean;
   placeholder: string;
   darkMode?: boolean;
+  icons?: WidgetIcons;
 }) => (
   <form onSubmit={onSubmit} className={`cvz-p-4 cvz-border-t ${
     darkMode 
@@ -414,7 +428,7 @@ const ChatInput = ({
             : 'cvz-bg-blue-600 cvz-hover:cvz-bg-blue-700 cvz-disabled:cvz-hover:cvz-bg-blue-600'
         }`}
       >
-        <PaperAirplaneIcon />
+        <IconSlot custom={icons?.send} fallback={<PaperAirplaneIcon />} className="cvz-w-5 cvz-h-5" />
       </button>
     </div>
     <div className="cvz-text-center cvz-mt-2">
@@ -819,31 +833,34 @@ const App = ({ config }: AppProps) => {
           borderStyle: 'solid',
         }}
       >
-        <ChatHeader 
-          title={config.headerMsg || 'Support Chat'} 
+        <ChatHeader
+          title={config.headerMsg || 'Support Chat'}
           subtitle={config.subheaderMsg || "We typically reply in a few minutes"}
           onClose={() => setIsOpen(false)}
           onClear={handleClearHistory}
           darkMode={config.darkMode}
+          icons={config.icons}
         />
 
-        <ChatMessages 
-          messages={messages} 
+        <ChatMessages
+          messages={messages}
           isStreaming={isStreaming}
           streamingMessage={streamingMessage}
           isFinalizingRef={isFinalizingRef}
           messagesEndRef={messagesEndRef}
           enableMarkdown={config.enableMarkdown}
           darkMode={config.darkMode}
+          icons={config.icons}
         />
 
-        <ChatInput 
-          value={inputValue} 
-          onChange={setInputValue} 
-          onSubmit={handleSendMessage} 
+        <ChatInput
+          value={inputValue}
+          onChange={setInputValue}
+          onSubmit={handleSendMessage}
           isLoading={isLoading || isStreaming}
           placeholder={config.promptPlaceholder || "Type a message..."}
           darkMode={config.darkMode}
+          icons={config.icons}
         />
       </div>
 
@@ -870,7 +887,9 @@ const App = ({ config }: AppProps) => {
         }}
       >
         <div className="cvz-text-white">
-          {isOpen ? <XMarkIcon /> : <ChatIcon />}
+          {isOpen
+            ? <IconSlot custom={config.icons?.close} fallback={<XMarkIcon />} className="cvz-w-6 cvz-h-6" />
+            : <IconSlot custom={config.icons?.launcher} fallback={<ChatIcon />} className="cvz-w-6 cvz-h-6" />}
         </div>
       </button>
     </div>
