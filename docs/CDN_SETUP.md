@@ -2,6 +2,13 @@
 
 This guide explains how to set up the ConverZen Chat Widget for CDN distribution.
 
+> **Status:** this describes a general-purpose CDN workflow, not what's actually running today.
+> In production the widget is deployed by `cvz-infra/deploy/deploy.sh --prod`, which copies
+> `dist/` straight to `/var/opt/services/converzen/public/widget/latest/` on the server; nginx
+> (`cvz-infra/nginx/converzen.de`) serves that at `https://converzen.de/widget/latest/`. There
+> is no `cdn.converzen.de` host and the package is not published to npm/unpkg/jsDelivr - treat
+> the CDN URLs below as illustrative until one of these paths is actually set up.
+
 ## Building for CDN
 
 The widget is already configured to build a CDN-ready file:
@@ -90,8 +97,10 @@ Once hosted, users can include:
   cvzWidget.init({
     chatUrl: "https://chat.converzen.de",
     apiKey: "your-api-key",
-    onSaveMessages: async (m) => {},
-    onLoadMessages: async () => []
+    onSaveMessages: async (sessionId, messages) => {},
+    onLoadMessages: async () => ({ sessionId: '', messages: [] })
   });
 </script>
 ```
+
+For the URL that's actually live today, see the main [README](../README.md#installation).

@@ -1,10 +1,10 @@
-import { StreamingData } from '@/types';
+import { StreamingData, ChatPersonaIdentifier } from '@/types';
 
 export interface StreamChatParams {
     baseUrl: string;
     sessionId?: string;
     message: string;
-    persona?: string;
+    persona?: string | ChatPersonaIdentifier;
     authToken: string;
     authType: 'apiKey' | 'bearer';
     maxTokens?: number;
@@ -117,7 +117,7 @@ export async function* streamChat(
   };
   
   if (!sessionId && (authType === 'apiKey') && persona) {
-      body.persona = persona;
+      body.persona = typeof persona === 'string' ? { alias: persona } : persona;
   }
 
   if (sessionId) {

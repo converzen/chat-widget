@@ -2,6 +2,12 @@
 
 This guide explains how to publish the ConverZen Chat Widget to npm, GitHub, and CDN.
 
+> **Status:** none of this has happened yet. `@converzen/chat-widget` is not on the npm
+> registry (`npm view @converzen/chat-widget` 404s), and there are no GitHub releases. The
+> widget currently reaches production only via `cvz-infra/deploy/deploy.sh --prod`, serving
+> `dist/` from `https://converzen.de/widget/latest/`. This guide is the plan for *if/when* npm
+> publishing happens, not a description of the current process.
+
 ## Prerequisites
 
 1. **npm account**: Create an account at [npmjs.com](https://www.npmjs.com/)
@@ -77,26 +83,8 @@ Once published, users can use via npm CDNs:
 
 ## 2. GitHub Repository
 
-### Initial Setup
-
-1. **Create repository** on GitHub (e.g., `converzen/chat-widget`)
-
-2. **Update package.json** (already done):
-   ```json
-   {
-     "repository": {
-       "type": "git",
-       "url": "https://github.com/converzen/chat-widget.git"
-     }
-   }
-   ```
-
-3. **Push to GitHub**:
-   ```bash
-   git remote add origin https://github.com/converzen/chat-widget.git
-   git branch -M main
-   git push -u origin main
-   ```
+The repository already exists at `git@github.com:converzen/chat-widget.git` and `package.json`'s
+`repository`/`bugs`/`homepage` fields already point at it - no setup needed here, only releases:
 
 ### GitHub Releases
 

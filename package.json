@@ -45,7 +45,7 @@
   "bugs": {
     "url": "https://github.com/converzen/chat-widget/issues"
   },
-  "homepage": "https://github.com/converzenF/chat-widget#readme",
+  "homepage": "https://github.com/converzen/chat-widget#readme",
   "devDependencies": {
     "@headlessui/react": "^1.7.0",
     "@heroicons/react": "^2.0.0",

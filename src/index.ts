@@ -13,15 +13,15 @@ if (options) {
   };
 }
 import styles from './styles/output.css';
-import { ChatMessage } from "@/types";
-export {ChatMessage};
+import { ChatMessage, ChatPersonaIdentifier } from "@/types";
+export {ChatMessage, ChatPersonaIdentifier};
 
 const HOST_ELEMENT_ID: string = 'cvz-widget-host'
 
 
 export interface TokenResponse {
   token: string;
-  expiresAt: number; // Unix timestamp in milliseconds, optional
+  expiresAt?: number; // Unix timestamp in milliseconds. Omit for a token that never expires.
 }
 
 export interface WidgetStyle {
@@ -62,7 +62,7 @@ export interface WidgetIcons {
 
 export interface WidgetConfig {
   apiKey?: string; // Direct API key (for insecure/demo mode) - uses X-API-Key header
-  getToken?: () => Promise<TokenResponse>; // Returns token string or TokenResponse with expiration
+  getToken?: () => Promise<string | TokenResponse>; // Returns a raw JWT string, or a TokenResponse with expiration
   onSaveMessages: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
   onLoadMessages: () => Promise<{sessionId: string, messages: ChatMessage[]}>;
   headerMsg?: string;
@@ -70,7 +70,12 @@ export interface WidgetConfig {
   initialGreeting?: string;
   promptPlaceholder?: string;
   chatUrl?: string; // Optional - defaults to 'https://chat.converzen.de'
-  persona?: string; // Optional persona identifier
+  // Optional persona/version selector. A plain string is shorthand for { alias: string }.
+  // Only takes effect in apiKey mode, and only on the first message of a new session -
+  // continuation requests reuse the persona the session was created with, and in
+  // getToken/JWT mode the persona is selected server-side when your backend requests
+  // the token (POST /api/get_token), not by the widget.
+  persona?: string | ChatPersonaIdentifier;
   darkMode?: boolean; // Optional - enable dark mode theme (default: false)
   style?: WidgetStyle; // Optional styling customization
   icons?: WidgetIcons; // Optional icon overrides (default: built-in outline icon set)

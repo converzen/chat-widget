@@ -9,31 +9,30 @@
   <h1>My Website</h1>
   <p>This is an example of using the ConverZen Chat Widget via CDN.</p>
   
-  <!-- Include the widget from CDN -->
-  <!-- Replace with your actual CDN URL -->
-  <script src="https://cdn.converzen.de/chat-widget/latest/cvz-widget.js"></script>
-  
+  <!-- Include the widget - this is the actual production URL -->
+  <script src="https://converzen.de/widget/latest/cvz-widget.js"></script>
+
   <!-- Initialize the widget -->
   <script>
     cvzWidget.init({
       // API endpoint (optional, defaults to https://chat.converzen.de)
       chatUrl: "https://chat.converzen.de",
-      
+
       // Authentication: Use API key for demo mode
       apiKey: "your-api-key-here",
-      
-      // OR use getToken for secure mode:
+
+      // OR use getToken for secure mode (never combine with apiKey):
       // getToken: async () => {
       //   const response = await fetch('/api/get-token');
       //   const data = await response.json();
-      //   return data.token;
+      //   return data.token; // raw JWT string, or { token, expiresAt }
       // },
-      
+
       // UI Customization
       headerMsg: "Chat with us",
       initialGreeting: "Hello! How can we help you today?",
       promptPlaceholder: "Type your message...",
-      
+
       // Optional: Styling
       style: {
         position: 'bottom-right',
@@ -45,26 +44,27 @@
           open: '#1F2937'
         }
       },
-      
-      // Message persistence callbacks
-      onSaveMessages: async (messages) => {
-        // Save messages to your backend
-        console.log('Saving messages:', messages);
+
+      // Message persistence callbacks - both required
+      onSaveMessages: async (sessionId, messages) => {
+        // Save the session id and messages to your backend
+        console.log('Saving:', sessionId, messages);
         // Example:
         // await fetch('/api/messages', {
         //   method: 'POST',
         //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(messages)
+        //   body: JSON.stringify({ sessionId, messages })
         // });
       },
-      
+
       onLoadMessages: async () => {
-        // Load messages from your backend
+        // Restore a previous conversation, or return an empty history
+        // to start fresh - the widget shows initialGreeting in that case
         console.log('Loading messages...');
         // Example:
         // const response = await fetch('/api/messages');
-        // return response.json();
-        return [];
+        // return response.json(); // { sessionId, messages }
+        return { sessionId: '', messages: [] };
       }
     });
   </script>

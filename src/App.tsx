@@ -476,8 +476,10 @@ const App = ({ config }: AppProps) => {
 
         // console.log(`loadHistory: sessionId: ${loadedSessionId}, messages: ${initialMessages.length} `)
 
-        // Set session ID from loaded data, or fallback to localStorage
-        if (!loadedSessionId) {
+        // Show the greeting only when there's genuinely no history to restore -
+        // not merely because sessionId is missing (a legacy array-only return, or a
+        // {sessionId, messages} return with an empty sessionId, can still carry messages).
+        if (initialMessages.length === 0) {
             initialMessages = [{
                 content: config.initialGreeting || DEFAULT_INITIAL_GREETING,
                 role: 'SYSTEM',
@@ -510,7 +512,7 @@ const App = ({ config }: AppProps) => {
       const now = Date.now() / 1000 + 5; // unix EPOCH seconds value + 5 seconds overlap
       const cached = tokenCacheRef.current;
       const isTokenValid = cached && (
-        cached.expiresAt === null || // No expiration - always valid
+        cached.expiresAt == null || // No expiration - always valid
         cached.expiresAt > now // Has expiration and not expired
       );
       
@@ -519,12 +521,13 @@ const App = ({ config }: AppProps) => {
       }
     }
 
-    // Fetch new token
-    const tokenResult = await config.getToken();
-    
-    // TokenResponse with expiration
-    const expiresAt = tokenResult.expiresAt;
-    tokenCacheRef.current = { token: tokenResult.token, expiresAt };
+    // Fetch new token - accepts either a raw string or a TokenResponse
+    const rawResult = await config.getToken();
+    const tokenResult: TokenResponse = typeof rawResult === 'string'
+      ? { token: rawResult, expiresAt: undefined }
+      : rawResult;
+
+    tokenCacheRef.current = tokenResult;
 
     return { token: tokenResult.token, type: 'bearer' };
   };

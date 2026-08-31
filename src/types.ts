@@ -5,6 +5,14 @@ export interface ChatMessage {
   sources?: string[]
 }
 
+// Selects which persona/version a chat request is routed to. Field names match the
+// cvz-chat wire format (ChatPersonaIdentifier) verbatim - do not camelCase them.
+export interface ChatPersonaIdentifier {
+  alias?: string       // Persona alias, e.g. "customer-support". Used by test/prod API keys.
+  persona_id?: number  // Numeric persona ID. Used by super/test API keys.
+  version_tag?: string // e.g. "next" to select the draft version. Test/super keys only.
+}
+
 
 export type StreamErrorCode = 'session_expired' | 'auth_failed' | 'unavailable' | 'content_filtered' | 'internal'
 
