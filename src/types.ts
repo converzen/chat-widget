@@ -17,12 +17,14 @@ export interface ChatPersonaIdentifier {
 export type StreamErrorCode = 'session_expired' | 'auth_failed' | 'unavailable' | 'content_filtered' | 'internal'
 
 export interface StreamingData {
-  type: 'session_created' | 'session_continued' | 'token' | 'error' | 'done'
+  type: 'session_created' | 'session_continued' | 'thinking' | 'tool_call_started' | 'token' | 'error' | 'done'
   content?: string
   session_id?: string
   sources?: string[]
   message?: string
   code?: StreamErrorCode
+  id?: string    // tool_call_started: tool call identifier
+  name?: string  // tool_call_started: tool name being called
 }
 
 export interface ChatModalConfig {

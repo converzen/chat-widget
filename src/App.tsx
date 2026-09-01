@@ -271,6 +271,8 @@ const ChatMessages = ({
   messages,
   isStreaming,
   streamingMessage,
+  thinkingMessage,
+  activeToolCall,
   isFinalizingRef,
   messagesEndRef,
   enableMarkdown,
@@ -280,6 +282,8 @@ const ChatMessages = ({
   messages: ChatMessage[];
   isStreaming: boolean;
   streamingMessage: string;
+  thinkingMessage?: string;
+  activeToolCall?: string | null;
   isFinalizingRef: RefObject<boolean>;
   messagesEndRef: RefObject<HTMLDivElement>;
   enableMarkdown?: boolean;
@@ -309,7 +313,7 @@ const ChatMessages = ({
     if (shouldAutoScroll && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, streamingMessage, shouldAutoScroll, messagesEndRef]);
+  }, [messages, streamingMessage, thinkingMessage, activeToolCall, shouldAutoScroll, messagesEndRef]);
 
   return (
     <div 
@@ -361,22 +365,32 @@ const ChatMessages = ({
       )}
       {isStreaming && !streamingMessage && (
         <div className="cvz-flex cvz-justify-start">
-          <div className={`cvz-p-3 cvz-rounded-2xl cvz-rounded-bl-none cvz-shadow-sm cvz-border ${
+          <div className={`cvz-max-w-[85%] cvz-p-3 cvz-rounded-2xl cvz-rounded-bl-none cvz-shadow-sm cvz-border ${
             darkMode
               ? 'cvz-bg-gray-800 cvz-border-gray-700'
               : 'cvz-bg-white cvz-border-gray-100'
           }`}>
-            <div className="cvz-flex cvz-space-x-1">
-              <div className={`cvz-w-2 cvz-h-2 cvz-rounded-full cvz-animate-bounce ${
-                darkMode ? 'cvz-bg-gray-500' : 'cvz-bg-gray-400'
-              }`} style={{ animationDelay: '0ms' }}></div>
-              <div className={`cvz-w-2 cvz-h-2 cvz-rounded-full cvz-animate-bounce ${
-                darkMode ? 'cvz-bg-gray-500' : 'cvz-bg-gray-400'
-              }`} style={{ animationDelay: '150ms' }}></div>
-              <div className={`cvz-w-2 cvz-h-2 cvz-rounded-full cvz-animate-bounce ${
-                darkMode ? 'cvz-bg-gray-500' : 'cvz-bg-gray-400'
-              }`} style={{ animationDelay: '300ms' }}></div>
-            </div>
+            {activeToolCall ? (
+              <span className={`cvz-text-sm cvz-italic ${darkMode ? 'cvz-text-gray-400' : 'cvz-text-gray-500'}`}>
+                Calling {activeToolCall}&hellip;
+              </span>
+            ) : thinkingMessage ? (
+              <span className={`cvz-text-sm cvz-italic ${darkMode ? 'cvz-text-gray-400' : 'cvz-text-gray-500'}`}>
+                {thinkingMessage}
+              </span>
+            ) : (
+              <div className="cvz-flex cvz-space-x-1">
+                <div className={`cvz-w-2 cvz-h-2 cvz-rounded-full cvz-animate-bounce ${
+                  darkMode ? 'cvz-bg-gray-500' : 'cvz-bg-gray-400'
+                }`} style={{ animationDelay: '0ms' }}></div>
+                <div className={`cvz-w-2 cvz-h-2 cvz-rounded-full cvz-animate-bounce ${
+                  darkMode ? 'cvz-bg-gray-500' : 'cvz-bg-gray-400'
+                }`} style={{ animationDelay: '150ms' }}></div>
+                <div className={`cvz-w-2 cvz-h-2 cvz-rounded-full cvz-animate-bounce ${
+                  darkMode ? 'cvz-bg-gray-500' : 'cvz-bg-gray-400'
+                }`} style={{ animationDelay: '300ms' }}></div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -448,6 +462,8 @@ const App = ({ config }: AppProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
+  const [thinkingMessage, setThinkingMessage] = useState('');
+  const [activeToolCall, setActiveToolCall] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -566,6 +582,7 @@ const App = ({ config }: AppProps) => {
         // Process stream events
       let accumulatedContent = '';
       let hasUnauthorizedError = false;
+      let hasFillerContent = false;
       
       for await (const event of streamGenerator) {
         // Check if stream was aborted
@@ -586,8 +603,27 @@ const App = ({ config }: AppProps) => {
             }
             break;
 
+          case 'thinking':
+            if (event.content) {
+              hasFillerContent = true;
+              setThinkingMessage((prev) => prev + event.content);
+            }
+            break;
+
+          case 'tool_call_started':
+            if (event.name) {
+              hasFillerContent = true;
+              setActiveToolCall(event.name);
+            }
+            break;
+
           case 'token':
             if (event.content) {
+              if (hasFillerContent) {
+                hasFillerContent = false;
+                setThinkingMessage('');
+                setActiveToolCall(null);
+              }
               streamBufferRef.current += event.content;
               accumulatedContent += event.content;
 
@@ -626,17 +662,21 @@ const App = ({ config }: AppProps) => {
               // Use functional updates to ensure we have the latest state
               setMessages((prev) => finalMessages);
               setStreamingMessage('');
+              setThinkingMessage('');
+              setActiveToolCall(null);
               setIsStreaming(false);
               setIsLoading(false);
-              
+
               // Reset flag after state updates
               setTimeout(() => {
                 isFinalizingRef.current = false;
               }, 0);
-              
+
               await config.onSaveMessages(currentSessionId, finalMessages);
             } else {
               setStreamingMessage('');
+              setThinkingMessage('');
+              setActiveToolCall(null);
               setIsStreaming(false);
               setIsLoading(false);
             }
@@ -668,6 +708,8 @@ const App = ({ config }: AppProps) => {
             // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
             await config.onSaveMessages(currentSessionId || '', errorMessages);
             setStreamingMessage('');
+            setThinkingMessage('');
+            setActiveToolCall(null);
             setIsStreaming(false);
             setIsLoading(false);
             abortControllerRef.current = null;
@@ -685,6 +727,8 @@ const App = ({ config }: AppProps) => {
       if (!abortController.signal.aborted && !hasUnauthorizedError) {
         console.error('Stream ended unexpectedly');
         setStreamingMessage('');
+        setThinkingMessage('');
+        setActiveToolCall(null);
         setIsStreaming(false);
         setIsLoading(false);
         abortControllerRef.current = null;
@@ -732,6 +776,8 @@ const App = ({ config }: AppProps) => {
     setIsLoading(true);
     setIsStreaming(true);
     setStreamingMessage('');
+    setThinkingMessage('');
+    setActiveToolCall(null);
 
     try {
       // Create new abort controller for this request
@@ -747,6 +793,8 @@ const App = ({ config }: AppProps) => {
       // Handle abort errors gracefully
       if (error instanceof Error && error.name === 'AbortError') {
         setStreamingMessage('');
+        setThinkingMessage('');
+        setActiveToolCall(null);
         setIsStreaming(false);
         setIsLoading(false);
         abortControllerRef.current = null;
@@ -764,6 +812,8 @@ const App = ({ config }: AppProps) => {
       // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
       await config.onSaveMessages(sessionId || '', errorMessages);
       setStreamingMessage('');
+      setThinkingMessage('');
+      setActiveToolCall(null);
       setIsStreaming(false);
       setIsLoading(false);
       abortControllerRef.current = null;
@@ -785,6 +835,8 @@ const App = ({ config }: AppProps) => {
       }]);
 
       setStreamingMessage('');
+      setThinkingMessage('');
+      setActiveToolCall(null);
       setSessionId(null);
       setIsStreaming(false);
       setIsLoading(false);
@@ -849,6 +901,8 @@ const App = ({ config }: AppProps) => {
           messages={messages}
           isStreaming={isStreaming}
           streamingMessage={streamingMessage}
+          thinkingMessage={thinkingMessage}
+          activeToolCall={activeToolCall}
           isFinalizingRef={isFinalizingRef}
           messagesEndRef={messagesEndRef}
           enableMarkdown={config.enableMarkdown}
