@@ -9,6 +9,10 @@ export interface StreamChatParams {
     authType: 'apiKey' | 'bearer';
     maxTokens?: number;
     abortSignal?: AbortSignal;
+    // Per-browser id for per-visitor rate limiting. Only sent as a header in
+    // apiKey mode - bearer/JWT mode carries it as a claim baked in when the
+    // token was minted (see getToken in WidgetConfig), not per-request.
+    clientId?: string;
 }
 
 
@@ -93,8 +97,8 @@ function parseSSEBuffer(buffer: string): StreamingData[] {
 export async function* streamChat(
   params: StreamChatParams
 ): AsyncGenerator<StreamingData, void, unknown> {
-  const { baseUrl, message, sessionId, persona, authToken, authType, maxTokens, abortSignal } = params;
-  
+  const { baseUrl, message, sessionId, persona, authToken, authType, maxTokens, clientId, abortSignal } = params;
+
   // Build headers
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -105,6 +109,9 @@ export async function* streamChat(
   // Set authentication header based on authType
   if (authType === 'apiKey') {
     headers['X-API-Key'] = authToken;
+    if (clientId) {
+      headers['X-Client-Id'] = clientId;
+    }
   } else {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
