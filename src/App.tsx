@@ -473,6 +473,8 @@ const App = ({ config }: AppProps) => {
   const isFinalizingRef = useRef(false);
   const streamBufferRef = useRef("");
   const rAFRef = useRef<number | null>(null);
+  const thinkingBufferRef = useRef("");
+  const thinkingRAFRef = useRef<number | null>(null);
 
   // Load messages and session ID on mount
   useEffect(() => {
@@ -627,7 +629,15 @@ const App = ({ config }: AppProps) => {
                 fillerVisibleSince = Date.now();
               }
               hasFillerContent = true;
-              setThinkingMessage((prev) => prev + event.content);
+              thinkingBufferRef.current += event.content;
+              if (!thinkingRAFRef.current) {
+                thinkingRAFRef.current = requestAnimationFrame(() => {
+                  const newText = thinkingBufferRef.current;
+                  thinkingBufferRef.current = "";
+                  thinkingRAFRef.current = null;
+                  setThinkingMessage((prev) => prev + newText);
+                });
+              }
             }
             break;
 
@@ -649,6 +659,7 @@ const App = ({ config }: AppProps) => {
                 await waitOutFillerDwell();
                 hasFillerContent = false;
                 fillerVisibleSince = 0;
+                thinkingBufferRef.current = '';
                 setThinkingMessage('');
                 setActiveToolCall(null);
               }
@@ -690,6 +701,7 @@ const App = ({ config }: AppProps) => {
               // Use functional updates to ensure we have the latest state
               setMessages((prev) => finalMessages);
               setStreamingMessage('');
+              thinkingBufferRef.current = '';
               setThinkingMessage('');
               setActiveToolCall(null);
               setIsStreaming(false);
@@ -703,6 +715,7 @@ const App = ({ config }: AppProps) => {
               await config.onSaveMessages(currentSessionId, finalMessages);
             } else {
               setStreamingMessage('');
+              thinkingBufferRef.current = '';
               setThinkingMessage('');
               setActiveToolCall(null);
               setIsStreaming(false);
@@ -736,6 +749,7 @@ const App = ({ config }: AppProps) => {
             // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
             await config.onSaveMessages(currentSessionId || '', errorMessages);
             setStreamingMessage('');
+            thinkingBufferRef.current = '';
             setThinkingMessage('');
             setActiveToolCall(null);
             setIsStreaming(false);
@@ -755,6 +769,7 @@ const App = ({ config }: AppProps) => {
       if (!abortController.signal.aborted && !hasUnauthorizedError) {
         console.error('Stream ended unexpectedly');
         setStreamingMessage('');
+        thinkingBufferRef.current = '';
         setThinkingMessage('');
         setActiveToolCall(null);
         setIsStreaming(false);
@@ -804,6 +819,7 @@ const App = ({ config }: AppProps) => {
     setIsLoading(true);
     setIsStreaming(true);
     setStreamingMessage('');
+    thinkingBufferRef.current = '';
     setThinkingMessage('');
     setActiveToolCall(null);
 
@@ -821,6 +837,7 @@ const App = ({ config }: AppProps) => {
       // Handle abort errors gracefully
       if (error instanceof Error && error.name === 'AbortError') {
         setStreamingMessage('');
+        thinkingBufferRef.current = '';
         setThinkingMessage('');
         setActiveToolCall(null);
         setIsStreaming(false);
@@ -840,6 +857,7 @@ const App = ({ config }: AppProps) => {
       // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
       await config.onSaveMessages(sessionId || '', errorMessages);
       setStreamingMessage('');
+      thinkingBufferRef.current = '';
       setThinkingMessage('');
       setActiveToolCall(null);
       setIsStreaming(false);
@@ -863,6 +881,7 @@ const App = ({ config }: AppProps) => {
       }]);
 
       setStreamingMessage('');
+      thinkingBufferRef.current = '';
       setThinkingMessage('');
       setActiveToolCall(null);
       setSessionId(null);
