@@ -62,7 +62,12 @@ export interface WidgetIcons {
 
 export interface WidgetConfig {
   apiKey?: string; // Direct API key (for insecure/demo mode) - uses X-API-Key header
-  getToken?: () => Promise<string | TokenResponse>; // Returns a raw JWT string, or a TokenResponse with expiration
+  // Returns a raw JWT string, or a TokenResponse with expiration. Receives the
+  // widget's per-browser client-id (localStorage-persisted) - forward it to
+  // your backend's POST /api/chat/get_token call (as `client_id`) so
+  // per-visitor rate limiting can identify this visitor across requests.
+  // Existing zero-arg implementations keep working unchanged.
+  getToken?: (clientId: string) => Promise<string | TokenResponse>;
   onSaveMessages: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
   onLoadMessages: () => Promise<{sessionId: string, messages: ChatMessage[]}>;
   headerMsg?: string;

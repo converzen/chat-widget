@@ -14,7 +14,7 @@ export interface ChatPersonaIdentifier {
 }
 
 
-export type StreamErrorCode = 'session_expired' | 'auth_failed' | 'unavailable' | 'content_filtered' | 'internal'
+export type StreamErrorCode = 'session_expired' | 'auth_failed' | 'unavailable' | 'content_filtered' | 'rate_limited' | 'internal'
 
 export interface StreamingData {
   type: 'session_created' | 'session_continued' | 'thinking' | 'tool_call_started' | 'token' | 'error' | 'done'

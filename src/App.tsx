@@ -6,6 +6,7 @@ import type { CSSProperties } from 'preact/compat';
 import {TokenResponse, WidgetConfig, WidgetStyle, WidgetIcons} from './index';
 import { ChatMessage } from './types';
 import { streamChat } from './services/streaming';
+import { getOrCreateClientId } from './clientId';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -538,7 +539,7 @@ const App = ({ config }: AppProps) => {
     }
 
     // Fetch new token - accepts either a raw string or a TokenResponse
-    const rawResult = await config.getToken();
+    const rawResult = await config.getToken(getOrCreateClientId());
     const tokenResult: TokenResponse = typeof rawResult === 'string'
       ? { token: rawResult, expiresAt: undefined }
       : rawResult;
@@ -574,6 +575,7 @@ const App = ({ config }: AppProps) => {
           persona: config.persona,
           authToken: auth.token,
           authType: auth.type,
+          clientId: getOrCreateClientId(),
           abortSignal: abortController.signal,
         });
 
