@@ -583,7 +583,23 @@ const App = ({ config }: AppProps) => {
       let accumulatedContent = '';
       let hasUnauthorizedError = false;
       let hasFillerContent = false;
-      
+      // Multiple SSE events parsed from the same network chunk are handled
+      // back-to-back with only a microtask gap between them - the browser
+      // never gets a paint in between, so e.g. a 'thinking' update can be
+      // fully overwritten by a 'tool_call_started' or 'token' that follows
+      // milliseconds later without ever being rendered. Track when the
+      // current filler text became visible and, before replacing it, wait
+      // out the rest of a minimum dwell time so the user actually sees it.
+      let fillerVisibleSince = 0;
+      const FILLER_MIN_DWELL_MS = 350;
+      const waitOutFillerDwell = async () => {
+        if (!fillerVisibleSince) return;
+        const remaining = FILLER_MIN_DWELL_MS - (Date.now() - fillerVisibleSince);
+        if (remaining > 0) {
+          await new Promise((resolve) => setTimeout(resolve, remaining));
+        }
+      };
+
       for await (const event of streamGenerator) {
         // Check if stream was aborted
         if (abortController.signal.aborted) {
@@ -605,6 +621,9 @@ const App = ({ config }: AppProps) => {
 
           case 'thinking':
             if (event.content) {
+              if (!hasFillerContent) {
+                fillerVisibleSince = Date.now();
+              }
               hasFillerContent = true;
               setThinkingMessage((prev) => prev + event.content);
             }
@@ -612,7 +631,12 @@ const App = ({ config }: AppProps) => {
 
           case 'tool_call_started':
             if (event.name) {
+              // A 'thinking' update may still be on screen (tool-call status
+              // takes rendering priority over it) - give it its dwell time
+              // before we replace it, or it'll never have been visible.
+              await waitOutFillerDwell();
               hasFillerContent = true;
+              fillerVisibleSince = Date.now();
               setActiveToolCall(event.name);
             }
             break;
@@ -620,7 +644,9 @@ const App = ({ config }: AppProps) => {
           case 'token':
             if (event.content) {
               if (hasFillerContent) {
+                await waitOutFillerDwell();
                 hasFillerContent = false;
+                fillerVisibleSince = 0;
                 setThinkingMessage('');
                 setActiveToolCall(null);
               }
