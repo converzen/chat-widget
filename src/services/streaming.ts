@@ -106,12 +106,15 @@ export async function* streamChat(
   };
 
   // console.log(`streamChat: using token type: ${authType}, sessionId: ${sessionId}`)
+  // Sent regardless of authType: in bearer/JWT mode this is a fallback for
+  // when the site's own get_token backend doesn't forward client_id into
+  // the JWT claim - see chat_api_key_middleware's client_id resolution.
+  if (clientId) {
+    headers['X-Client-Id'] = clientId;
+  }
   // Set authentication header based on authType
   if (authType === 'apiKey') {
     headers['X-API-Key'] = authToken;
-    if (clientId) {
-      headers['X-Client-Id'] = clientId;
-    }
   } else {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
