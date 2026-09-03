@@ -77,7 +77,7 @@ This is how the widget is served in production today. Just include the script ta
 
 Pin a specific release instead of `latest` once one exists (e.g. `https://converzen.de/widget/1.0.0/cvz-widget.js`) for production stability — `latest` moves out from under you on every deploy.
 
-Need Markdown rendering in messages? Load `cvz-widget-md.js` instead (same path, same global) and set `enableMarkdown: true` — see [Markdown Support](#markdown-support) below.
+Need Markdown rendering in messages? Just set `enableMarkdown: true` — see [Markdown Support](#markdown-support) below.
 
 ### Option 2: NPM Package
 
@@ -124,7 +124,7 @@ npm install
 npm run build
 ```
 
-This produces `dist/cvz-widget.js` (and `dist/cvz-widget-md.js`) which you can host or copy into your own project like the CDN build.
+This produces `dist/cvz-widget.js`, which you can host or copy into your own project like the CDN build.
 
 ## Configuration
 
@@ -138,12 +138,16 @@ cvzWidget.init({
   // Authentication: Use either apiKey OR getToken (not both)
   apiKey: "sk_test_...", // For demo/insecure mode - sent as the X-API-Key header
   // OR
-  getToken: async () => {
+  getToken: async (clientId) => {
     // For secure mode - keeps the api-key out of the client.
     // Call your own backend, which exchanges your api-key for a short-lived
     // JWT via cvz-chat's POST /api/get_token. Your route should be secured
-    // by a login or recaptcha.
-    const response = await fetch('/api/get-token');
+    // by a login or recaptcha. Forward clientId as `client_id` in that call
+    // so per-visitor rate limiting can identify this visitor - see below.
+    const response = await fetch('/api/get-token', {
+      method: 'POST',
+      body: JSON.stringify({ clientId }),
+    });
     const data = await response.json();
     return data.token; // a raw JWT string, or { token, expiresAt } - see below
   },
@@ -176,6 +180,12 @@ Use exactly one of `apiKey` or `getToken` - never both:
 
 - **`apiKey`** ("demo"/insecure mode): the raw key is sent to `chatUrl` in every request via the `X-API-Key` header. Anyone who can read your page's JS can read this key, so only use it for keys scoped to a low-privilege, rate-limited persona.
 - **`getToken`** ("secure" mode): your own backend holds the real API key, calls cvz-chat's `POST /api/get_token` (optionally passing `persona` there — see below) to mint a short-lived JWT, and hands only that JWT to the widget. The widget sends it as `Authorization: Bearer <token>` and caches it until it expires.
+
+#### Per-visitor rate limiting (`clientId`)
+
+The widget generates a stable per-browser id (stored in `localStorage`) and passes it as the sole argument to your `getToken` callback: `getToken(clientId)`. Existing zero-argument `getToken` implementations keep working unchanged - the argument is simply ignored if you don't declare it.
+
+In `apiKey` mode this id is sent automatically on every request as an `X-Client-Id` header, so there's nothing for you to wire up. In `getToken`/JWT mode, forward it to cvz-chat's `POST /api/get_token` as `client_id` so the minted JWT carries it as a claim and per-visitor rate limiting can identify the visitor; the widget also sends it as a fallback `X-Client-Id` header in this mode in case your backend doesn't forward it into the token. This id is a cost-control signal, not a security boundary - clearing storage or an incognito window resets it.
 
 `getToken` may return either:
 
@@ -250,7 +260,7 @@ cvzWidget.init({
 
 ### Markdown Support
 
-Assistant messages are plain text unless you opt in to Markdown rendering (GitHub-Flavored Markdown, via `react-markdown` + `remark-gfm`). This adds real bundle size, so it's a separate build:
+Assistant messages are plain text unless you opt in to Markdown rendering (GitHub-Flavored Markdown, via `react-markdown` + `remark-gfm`). This is a runtime flag, not a separate build - the renderer ships in the one bundle, it's just inactive until you turn it on:
 
 ```javascript
 cvzWidget.init({
@@ -258,18 +268,6 @@ cvzWidget.init({
   enableMarkdown: true,
 });
 ```
-
-```html
-<!-- CDN: load the -md build instead of the base one -->
-<script src="https://converzen.de/widget/latest/cvz-widget-md.js"></script>
-```
-
-```typescript
-// npm: import the /markdown subpath instead of the package root
-import cvzWidget from '@converzen/chat-widget/markdown';
-```
-
-Setting `enableMarkdown: true` while loading the base (non-`-md`) bundle has no effect - messages still render as plain text, since the Markdown renderer isn't in that bundle at all.
 
 ### Dark Mode
 
@@ -290,7 +288,7 @@ Restyles the header, message bubbles, input, and Markdown content for a dark bac
 |--------|------|----------|---------|-------------|
 | `chatUrl` | `string` | No | `"https://chat.converzen.de"` | cvz-chat API base URL |
 | `apiKey` | `string` | No* | - | Direct API key (insecure/demo mode) |
-| `getToken` | `() => Promise<string \| TokenResponse>` | No* | - | Returns a JWT to use in secure mode |
+| `getToken` | `(clientId: string) => Promise<string \| TokenResponse>` | No* | - | Returns a JWT to use in secure mode - see [Per-visitor rate limiting](#per-visitor-rate-limiting-clientid) |
 | `onSaveMessages` | `(sessionId: string, messages: ChatMessage[]) => Promise<void>` | Yes | - | Called after every completed exchange, error, and history clear |
 | `onLoadMessages` | `() => Promise<{ sessionId: string, messages: ChatMessage[] }>` | Yes | - | Called once on mount to restore history |
 | `headerMsg` | `string` | No | `"Support Chat"` | Header title |
@@ -299,7 +297,7 @@ Restyles the header, message bubbles, input, and Markdown content for a dark bac
 | `promptPlaceholder` | `string` | No | `"Type a message..."` | Input placeholder |
 | `persona` | `string \| ChatPersonaIdentifier` | No | - | Persona/version selector - see [Persona Selection](#persona-selection) for when this actually applies |
 | `darkMode` | `boolean` | No | `false` | Enable the dark theme |
-| `enableMarkdown` | `boolean` | No | `false` | Render assistant messages as Markdown/GFM. Requires the `-md`/`markdown` build |
+| `enableMarkdown` | `boolean` | No | `false` | Render assistant messages as Markdown/GFM |
 | `style` | `WidgetStyle` | No | - | Styling customization |
 | `icons` | `WidgetIcons` | No | - | Icon overrides |
 
