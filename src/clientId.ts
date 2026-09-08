@@ -54,7 +54,11 @@ declare global {
         options: {
           sitekey: string;
           action?: string;
-          size?: 'invisible' | 'normal' | 'compact';
+          // Cloudflare's own valid values - there is no "invisible" size.
+          // Whether a challenge ever becomes visible at all is decided by
+          // the site key's Widget Mode, configured in the Cloudflare
+          // dashboard, not by this parameter.
+          size?: 'normal' | 'compact' | 'flexible';
           callback: (token: string) => void;
           'error-callback'?: (error: unknown) => void;
         },
@@ -195,7 +199,13 @@ async function getTurnstileToken(siteKey: string): Promise<string> {
     window.turnstile.render(container, {
       sitekey: siteKey,
       action: CAPTCHA_ACTION,
-      size: 'invisible',
+      // No `size` here - Cloudflare rejects "invisible" as a value (only
+      // normal/compact/flexible are valid); whether this ever surfaces an
+      // interactive checkbox is decided by the site key's own Widget Mode.
+      // The container being display:none only hides genuinely-invisible
+      // (Managed/Non-Interactive) widgets; an interactive one would be
+      // unsolvable this way - a real UX gap for Milestone 4's other
+      // integrators, flagged but not addressed here.
       callback: (token) => {
         resolve(token);
         cleanup();
