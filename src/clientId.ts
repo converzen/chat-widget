@@ -189,11 +189,19 @@ async function getTurnstileToken(siteKey: string): Promise<string> {
       reject(new Error('turnstile unavailable after script load'));
       return;
     }
-    // Turnstile needs a real (if invisible/zero-size) container element to
-    // render into, unlike reCAPTCHA v3's bare execute() - a real
-    // implementation difference, not just a different script URL.
+    // Turnstile needs a real container element to render into, unlike
+    // reCAPTCHA v3's bare execute() - a real implementation difference, not
+    // just a different script URL. Positioned off-screen rather than
+    // display:none: a display:none subtree is frequently not part of the
+    // active render pipeline in most browsers (throttled/suspended
+    // rAF/timers, no layout), which breaks the legitimate-browser signals
+    // Cloudflare's iframe-based challenge relies on to pass a visitor -
+    // confirmed live (0/12 challenges solved, 100% flagged "likely bot"
+    // with display:none). Off-screen-but-laid-out keeps it fully live.
     const container = document.createElement('div');
-    container.style.display = 'none';
+    container.style.position = 'fixed';
+    container.style.top = '-9999px';
+    container.style.left = '-9999px';
     document.body.appendChild(container);
     const cleanup = () => container.remove();
     window.turnstile.render(container, {
@@ -202,10 +210,10 @@ async function getTurnstileToken(siteKey: string): Promise<string> {
       // No `size` here - Cloudflare rejects "invisible" as a value (only
       // normal/compact/flexible are valid); whether this ever surfaces an
       // interactive checkbox is decided by the site key's own Widget Mode.
-      // The container being display:none only hides genuinely-invisible
-      // (Managed/Non-Interactive) widgets; an interactive one would be
-      // unsolvable this way - a real UX gap for Milestone 4's other
-      // integrators, flagged but not addressed here.
+      // Off-screen positioning fixes rendering, not solvability - an
+      // interactive (Managed) site key can still require a click a visitor
+      // will never see; that needs the key itself set to Invisible mode in
+      // the Cloudflare dashboard, which this code can't detect or fix.
       callback: (token) => {
         resolve(token);
         cleanup();
