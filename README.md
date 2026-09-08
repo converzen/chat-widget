@@ -149,6 +149,12 @@ cvzWidget.init({
       body: JSON.stringify({ clientId }),
     });
     const data = await response.json();
+    if (!response.ok) {
+      // Propagate cvz-chat's own error text (have your backend forward it
+      // as-is) rather than a generic message - the widget looks for it to
+      // recover automatically if clientId itself was the problem, see below.
+      throw new Error(typeof data === 'string' ? data : JSON.stringify(data));
+    }
     return data.token; // a raw JWT string, or { token, expiresAt } - see below
   },
 
@@ -201,6 +207,8 @@ async () => ({ token: "eyJhbGciOi...", expiresAt: Date.now() + 3600_000 })
 `expiresAt` is a Unix timestamp **in milliseconds**; omit it for a token with no fixed lifetime.
 
 On a 401/403 from the chat API, the widget clears its cached token, calls `getToken` again, and retries the request once.
+
+If your `getToken` throws/rejects with cvz-chat's own `get_token` error text (`invalid client_id` or `client_id does not belong to this account` - see the example above, which forwards it as-is), the widget treats that as its client_id being stale rather than a generic failure: it discards the cached one, requests a fresh one from cvz-chat, and retries `getToken` once more with it. This is throttled to once an hour per browser for accounts with no CAPTCHA on client_id issuance, so a durably-invalid id (e.g. after a server-side key rotation) can't turn into a request on every message; accounts that do require a CAPTCHA aren't throttled this way, since solving one is itself the cost gate. If your backend doesn't propagate that exact error text, this recovery step simply never triggers - no different from before it existed.
 
 ### Persona Selection
 

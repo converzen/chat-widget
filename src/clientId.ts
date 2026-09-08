@@ -1,6 +1,27 @@
 const LEGACY_CLIENT_ID_STORAGE_KEY = 'cvz_client_id';
 const SERVER_CLIENT_ID_STORAGE_KEY = 'cvz_client_id_v2';
+const CAPTCHA_GATED_STORAGE_KEY = 'cvz_client_id_captcha_gated';
+const LAST_FORCED_REISSUE_STORAGE_KEY = 'cvz_client_id_last_forced_reissue';
 const CAPTCHA_ACTION = 'issue_client_id';
+
+// How often get_token rejecting a cached client_id may trigger minting a
+// fresh one, for accounts with no CAPTCHA gating. Without this, a client_id
+// invalidated server-side (e.g. a client_id_secret rotation) would otherwise
+// re-hit /api/chat/client_id on every single message. Accounts that DO
+// require a CAPTCHA skip this cooldown entirely - solving one is itself the
+// cost gate, so there's nothing left to throttle client-side.
+const FORCED_REISSUE_COOLDOWN_MS = 60 * 60 * 1000;
+
+// The exact bodies cvz-chat's get_token returns (as a bare JSON string, not
+// {error: ...}) when a presented client_id is rejected - see the "Client ID
+// Protocol" design. Matched against whatever a customer's getToken()
+// implementation throws/rejects with; only fires if that implementation
+// propagates cvz-chat's response body into the error (documented in the
+// README) - otherwise this just never matches, same as before it existed.
+const INVALID_CLIENT_ID_MESSAGES = [
+  'invalid client_id',
+  'client_id does not belong to this account',
+];
 
 type CaptchaProvider = 'recaptcha_v3' | 'turnstile';
 
@@ -56,6 +77,41 @@ function writeStorage(key: string, value: string): void {
   } catch {
     // private mode / disabled storage - just doesn't persist across reloads
   }
+}
+
+function clearStorage(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // as above - nothing to clean up if storage was never writable
+  }
+}
+
+/**
+ * Whether cvz-chat has told this browser its account requires a CAPTCHA to
+ * issue a client_id - learned reactively the first time issuance hits the
+ * `recaptcha_required` branch below, and kept up to date on every
+ * subsequent issuance so an account flipping the setting either way is
+ * reflected within one issuance, not stuck on a stale first impression.
+ */
+function isCaptchaGated(): boolean {
+  return readStorage(CAPTCHA_GATED_STORAGE_KEY) === '1';
+}
+
+function setCaptchaGated(gated: boolean): void {
+  writeStorage(CAPTCHA_GATED_STORAGE_KEY, gated ? '1' : '0');
+}
+
+/**
+ * True when `err` (whatever a customer's `getToken` implementation threw or
+ * rejected with) looks like cvz-chat's own get_token rejecting a client_id
+ * it didn't mint or that belongs to a different account - as opposed to an
+ * unrelated failure (network error, bad API key, backend bug) that a fresh
+ * client_id wouldn't fix and that retrying could make worse.
+ */
+export function isInvalidClientIdError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+  return INVALID_CLIENT_ID_MESSAGES.some((known) => message.includes(known));
 }
 
 /**
@@ -215,10 +271,12 @@ export async function getOrCreateClientId(
 
   try {
     let res = await issueClientId(baseUrl, publicId);
+    let gated = false;
 
     if (res.status === 400) {
       const body: unknown = await res.json();
       if (isCaptchaRequiredResponse(body)) {
+        gated = true;
         const token = await getCaptchaToken(body.provider, body.site_key);
         res = await issueClientId(baseUrl, publicId, token);
       } else {
@@ -232,6 +290,11 @@ export async function getOrCreateClientId(
       return null;
     }
 
+    // Only recorded on a completed round trip, not a network failure above -
+    // a transient error shouldn't overwrite what we last actually learned
+    // about this account's setting.
+    setCaptchaGated(gated);
+
     const data = (await res.json()) as { client_id: string };
     writeStorage(SERVER_CLIENT_ID_STORAGE_KEY, data.client_id);
     return data.client_id;
@@ -239,4 +302,52 @@ export async function getOrCreateClientId(
     console.warn('cvzWidget: client_id issuance failed', err);
     return null;
   }
+}
+
+/**
+ * Called when a customer's `getToken` implementation threw/rejected with an
+ * error matching {@link isInvalidClientIdError} - the cached client_id
+ * `getOrCreateClientId` handed out is one cvz-chat's get_token just refused,
+ * so it's discarded and (subject to the cooldown below) replaced.
+ *
+ * Without a cooldown, a client_id that's durably invalid (not a one-off -
+ * e.g. cvz-chat rotated `security.client_id_secret`) would otherwise mint a
+ * new one on every single message from every affected visitor. Accounts
+ * gated by a CAPTCHA are exempt: solving one is itself the cost gate, so an
+ * attacker can't turn this into a cheap loop, and a legitimate visitor
+ * self-heals immediately rather than waiting out an hour of degraded
+ * (client_id-less) service.
+ *
+ * Returns the freshly issued client_id, or `null` if none is available
+ * right now (cooldown still active, or issuance itself failed) - callers
+ * should proceed with no client_id in that case, same as
+ * `getOrCreateClientId`.
+ */
+export async function refreshClientIdAfterRejection(
+  baseUrl: string,
+  publicId?: string,
+): Promise<string | null> {
+  if (!publicId) {
+    // The rejected id was the legacy self-generated one, or there's no
+    // account to ask cvz-chat for a real one - nothing to refresh.
+    return null;
+  }
+
+  if (!isCaptchaGated()) {
+    const last = Number(readStorage(LAST_FORCED_REISSUE_STORAGE_KEY) ?? '0');
+    if (Date.now() - last < FORCED_REISSUE_COOLDOWN_MS) {
+      // Too soon - drop the known-bad id and proceed without one this round
+      // rather than re-hit /api/chat/client_id; cvz-chat accepts a missing
+      // client_id until enforcement is turned on.
+      clearStorage(SERVER_CLIENT_ID_STORAGE_KEY);
+      return null;
+    }
+  }
+
+  // Recorded before attempting (not after, and not only on success) so a
+  // run of failures - cvz-chat briefly unreachable, say - can't retry
+  // faster than the cooldown either.
+  writeStorage(LAST_FORCED_REISSUE_STORAGE_KEY, String(Date.now()));
+  clearStorage(SERVER_CLIENT_ID_STORAGE_KEY);
+  return getOrCreateClientId(baseUrl, publicId);
 }

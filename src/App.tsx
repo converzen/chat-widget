@@ -6,7 +6,7 @@ import type { CSSProperties } from 'preact/compat';
 import {TokenResponse, WidgetConfig, WidgetStyle, WidgetIcons} from './index';
 import { ChatMessage } from './types';
 import { streamChat } from './services/streaming';
-import { getOrCreateClientId } from './clientId';
+import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterRejection } from './clientId';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -540,6 +540,7 @@ const App = ({ config }: AppProps) => {
     if (!config.getToken) {
       throw new Error('Either apiKey or getToken must be provided');
     }
+    const getToken = config.getToken;
 
     // Check token cache first (unless forcing refresh)
     if (!forceRefresh) {
@@ -556,10 +557,29 @@ const App = ({ config }: AppProps) => {
     }
 
     // Fetch new token - accepts either a raw string or a TokenResponse
-    const rawResult = await config.getToken(await getClientId());
-    const tokenResult: TokenResponse = typeof rawResult === 'string'
-      ? { token: rawResult, expiresAt: undefined }
-      : rawResult;
+    const fetchToken = async (): Promise<TokenResponse> => {
+      const rawResult = await getToken(await getClientId());
+      return typeof rawResult === 'string'
+        ? { token: rawResult, expiresAt: undefined }
+        : rawResult;
+    };
+
+    let tokenResult: TokenResponse;
+    try {
+      tokenResult = await fetchToken();
+    } catch (err) {
+      // Only a client_id cvz-chat itself rejected is worth reacting to here -
+      // anything else (network error, bad API key, backend bug) wouldn't be
+      // fixed by a new client_id and just needs to propagate as before.
+      if (!isInvalidClientIdError(err)) {
+        throw err;
+      }
+      const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
+      clientIdPromiseRef.current = Promise.resolve(
+        await refreshClientIdAfterRejection(baseUrl, config.publicId),
+      );
+      tokenResult = await fetchToken(); // one retry with the (possibly still-null) client_id
+    }
 
     tokenCacheRef.current = tokenResult;
 
