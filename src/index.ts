@@ -63,11 +63,16 @@ export interface WidgetIcons {
 export interface WidgetConfig {
   apiKey?: string; // Direct API key (for insecure/demo mode) - uses X-API-Key header
   // Returns a raw JWT string, or a TokenResponse with expiration. Receives the
-  // widget's per-browser client-id (localStorage-persisted) - forward it to
-  // your backend's POST /api/chat/get_token call (as `client_id`) so
-  // per-visitor rate limiting can identify this visitor across requests.
+  // widget's per-browser client-id - forward it to your backend's
+  // POST /api/chat/get_token call (as `client_id`) so per-visitor rate
+  // limiting can identify this visitor across requests. `null` when no
+  // client_id is available right now (e.g. `publicId` isn't configured, or
+  // cvz-chat couldn't be reached to issue one) - forward it through as-is
+  // rather than substituting your own value; cvz-chat treats a missing
+  // client_id as "not yet provided", not as an error, until enforcement is
+  // turned on for your account.
   // Existing zero-arg implementations keep working unchanged.
-  getToken?: (clientId: string) => Promise<string | TokenResponse>;
+  getToken?: (clientId: string | null) => Promise<string | TokenResponse>;
   onSaveMessages: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
   onLoadMessages: () => Promise<{sessionId: string, messages: ChatMessage[]}>;
   headerMsg?: string;
@@ -75,6 +80,12 @@ export interface WidgetConfig {
   initialGreeting?: string;
   promptPlaceholder?: string;
   chatUrl?: string; // Optional - defaults to 'https://chat.converzen.de'
+  // The non-secret id (from your ConverZen dashboard, next to your API key)
+  // that lets the widget request a client_id directly from cvz-chat instead
+  // of generating one itself. Required to get a cvz-chat-issued,
+  // spoof-resistant client_id in getToken/JWT mode; without it the widget
+  // falls back to a self-generated one, same as before this existed.
+  publicId?: string;
   // Optional persona/version selector. A plain string is shorthand for { alias: string }.
   // Only takes effect in apiKey mode, and only on the first message of a new session -
   // continuation requests reuse the persona the session was created with, and in

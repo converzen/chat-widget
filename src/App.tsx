@@ -470,6 +470,16 @@ const App = ({ config }: AppProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const tokenCacheRef = useRef<TokenResponse  | null>(null);
+  // Memoized so a client_id fetched from cvz-chat only ever happens once
+  // per widget mount, no matter how many call sites need it.
+  const clientIdPromiseRef = useRef<Promise<string | null> | null>(null);
+  const getClientId = (): Promise<string | null> => {
+    if (!clientIdPromiseRef.current) {
+      const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
+      clientIdPromiseRef.current = getOrCreateClientId(baseUrl, config.publicId);
+    }
+    return clientIdPromiseRef.current;
+  };
   const isFinalizingRef = useRef(false);
   const streamBufferRef = useRef("");
   const rAFRef = useRef<number | null>(null);
@@ -512,6 +522,11 @@ const App = ({ config }: AppProps) => {
       }
     };
     loadHistory();
+    // Kick off client_id resolution at mount rather than on the user's
+    // first message - getClientId() memoizes, so this just means the
+    // round trip to cvz-chat overlaps page load instead of adding latency
+    // to sending.
+    void getClientId();
   }, [config]);
 
 
@@ -541,7 +556,7 @@ const App = ({ config }: AppProps) => {
     }
 
     // Fetch new token - accepts either a raw string or a TokenResponse
-    const rawResult = await config.getToken(getOrCreateClientId());
+    const rawResult = await config.getToken(await getClientId());
     const tokenResult: TokenResponse = typeof rawResult === 'string'
       ? { token: rawResult, expiresAt: undefined }
       : rawResult;
@@ -577,7 +592,7 @@ const App = ({ config }: AppProps) => {
           persona: config.persona,
           authToken: auth.token,
           authType: auth.type,
-          clientId: getOrCreateClientId(),
+          clientId: (await getClientId()) ?? undefined,
           abortSignal: abortController.signal,
         });
 
