@@ -3,6 +3,7 @@
 # Build output - keep dist/ for CDN, but ignore in git
 # dist/ is included in npm package via package.json "files" field
 # Uncomment the line below if you want to exclude dist from git
+/.claude
 /.worktrees
 /dist/
 
