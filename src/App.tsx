@@ -10,6 +10,13 @@ import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterReject
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+// Injected at build time (esbuild `define` in tsup.config.ts) - see index.ts.
+// Declared again here since it's an ambient const scoped per-module.
+declare const __CVZ_BUILD_ID__: string;
+// Just the commit hash for display - __CVZ_BUILD_ID__ is `<hash>-<iso-timestamp>`,
+// and the timestamp half is too long to sit next to "Powered by ConverZen".
+const CVZ_BUILD_TAG = __CVZ_BUILD_ID__.split('-')[0];
+
 // --- Icons ---
 const DEFAULT_CHAT_API_URL = 'https://chat.converzen.de';
 const DEFAULT_INITIAL_GREETING: string = "Hi, how can I help you ?"
@@ -449,7 +456,13 @@ const ChatInput = ({
     <div className="cvz-text-center cvz-mt-2">
       <p className={`cvz-text-[10px] ${
         darkMode ? 'cvz-text-gray-500' : 'cvz-text-gray-400'
-      }`}>Powered by ConverZen</p>
+      }`}>
+        Powered by ConverZen
+        {/* Inconspicuous build tag - which commit + build actually produced
+            this bundle, for verifying a deploy actually took effect. Not
+            meant to be noticed; just findable when you go looking. */}
+        <span className={darkMode ? 'cvz-text-gray-600' : 'cvz-text-gray-300'}> · {CVZ_BUILD_TAG}</span>
+      </p>
     </div>
   </form>
 );
