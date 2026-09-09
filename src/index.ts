@@ -112,6 +112,23 @@ export interface WidgetConfig {
   // Default false (no UI, no behavior change) - only turn this on for
   // accounts that have set up end-user billing plans in the dashboard.
   endUserLicensing?: boolean;
+  // Pluggable history persistence, for a host app that wants its own
+  // backend (e.g. cross-device sync for a logged-in user) instead of the
+  // built-in `persistMessages` localStorage default. Either callback takes
+  // priority over `persistMessages` when supplied; omit both to keep using
+  // the built-in behavior. `onLoadMessages` must return `sessionId: ''`
+  // (never a fabricated id) when there's nothing to restore - see
+  // src/history.ts's defaultLoadMessages for why.
+  onSaveMessages?: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
+  onLoadMessages?: () => Promise<{ sessionId: string; messages: ChatMessage[] }>;
+  // Arbitrary extra fields merged verbatim into every completion/continuation
+  // request body - e.g. a host app's own RAG-grounding hints. Field names
+  // must match cvz-chat's wire format exactly, same as `persona`.
+  extraContext?: Record<string, unknown>;
+  // Start the chat panel already open on mount, instead of waiting for a
+  // launcher click - e.g. a host app's own "ask about this" button that
+  // re-inits the widget with different `extraContext`. Default false.
+  autoOpen?: boolean;
 }
 
 class WidgetManager {

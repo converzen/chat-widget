@@ -19,15 +19,19 @@ function getBuildId(): string {
 }
 
 export default defineConfig([
-  // Markdown build (with markdown support)
   {
     entry: {
       'cvz-widget': 'src/index.ts',
     },
-    format: ['iife'],
+    // 'iife' is the CDN/script-tag build (self-registers window.cvzWidget,
+    // still what converzen.de's own production deploy serves). 'esm' is a
+    // real module build for npm-style consumers (e.g. `import cvzWidget
+    // from '@converzen/chat-widget'`) - it still self-registers the global
+    // too (harmless, same as the IIFE), it's just also a proper module.
+    format: ['iife', 'esm'],
     // globalName removed to allow manual assignment in index.ts
     outDir: 'dist',
-    outExtension: () => ({ js: '.js' }),
+    outExtension: ({ format }) => ({ js: format === 'esm' ? '.mjs' : '.js' }),
     clean: false, // Don't clean on second build
     minify: true,
     treeshake: true,
