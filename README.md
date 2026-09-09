@@ -45,19 +45,8 @@ This is how the widget is served in production today. Just include the script ta
                       apiKey: "your-api-key-here",
                       headerMsg: "Chat with us",
                       initialGreeting: "Hello! How can we help you?",
-                      onSaveMessages: async (sessionId, messages) => {
-                          // Save messages (and the session id) to your backend
-                          await fetch('/api/messages', {
-                              method: 'POST',
-                              body: JSON.stringify({ sessionId, messages })
-                          });
-                      },
-                      onLoadMessages: async () => {
-                          // Restore a previous conversation, or return an empty
-                          // history to start fresh (the widget shows the greeting)
-                          const response = await fetch('/api/messages');
-                          return response.json(); // { sessionId, messages }
-                      }
+                      // Conversation history persists to localStorage automatically -
+                      // see Message persistence below to turn it off (persistMessages: false).
                   });
               }
           };
@@ -104,8 +93,6 @@ import cvzWidget, { WidgetConfig } from '@converzen/chat-widget';
 const config: WidgetConfig = {
   apiKey: "your-api-key-here",
   headerMsg: "Chat with us",
-  onSaveMessages: async (sessionId, messages) => { /* ... */ },
-  onLoadMessages: async () => ({ sessionId: '', messages: [] }),
 };
 
 cvzWidget.init(config);
@@ -158,17 +145,9 @@ cvzWidget.init({
     return data.token; // a raw JWT string, or { token, expiresAt } - see below
   },
 
-  // Message persistence - both optional. Omit both to use the widget's own
-  // built-in persistence (localStorage, lightly obfuscated) - see below.
-  // Supply your own only if you need a backend, analytics, or storage the
-  // built-in default doesn't cover.
-  onSaveMessages: async (sessionId, messages) => {
-    // Save to your backend or local storage
-  },
-  onLoadMessages: async () => {
-    // Load from your backend or local storage
-    return { sessionId: '', messages: [] };
-  },
+  // Conversation history persists to localStorage automatically - see
+  // Message persistence below to turn it off.
+  persistMessages: true,
 
   // UI Customization
   headerMsg: "Chat with us",
@@ -217,9 +196,9 @@ If `WidgetConfig.publicId` is set (the non-secret id from your ConverZen dashboa
 
 #### Message persistence
 
-`onSaveMessages`/`onLoadMessages` are both optional. Omit them and the widget persists history to `localStorage` itself, under its own key, lightly obfuscated (Base64, not encryption - there's no key to speak of, since it would ship in this same public JS bundle either way; this stops a casual glance at localStorage in devtools, nothing that resists real intent). One shared key per origin, same as `clientId` - if you run multiple personas on one page and want separate histories per persona, supply your own callbacks instead.
+Conversation history persists to `localStorage` automatically - one shared key per origin, lightly obfuscated (Base64, not encryption - there's no key to speak of, since it would ship in this same public JS bundle either way; this stops a casual glance at localStorage in devtools, nothing that resists real intent). Set `persistMessages: false` for session-only history instead - nothing written, nothing restored, a fresh conversation on every reload.
 
-Supply your own when you need a backend, cross-device sync, analytics, or anything the built-in default doesn't cover. If you do, take care that a fresh visitor's `onLoadMessages` returns `sessionId: ''` (never a client-generated id) - the widget sends a non-empty `sessionId` to `POST /api/chat/continuation/stream` as an existing session, and a session cvz-chat has never actually created there 404s, surfacing as a confusing "temporarily unavailable" error on someone's very first message.
+There's no way to plug in your own backend, cross-device sync, or analytics for this - `persistMessages` is the only lever, on (`localStorage`) or off (nothing).
 
 ### Persona Selection
 
@@ -308,8 +287,7 @@ Restyles the header, message bubbles, input, and Markdown content for a dark bac
 | `chatUrl` | `string` | No | `"https://chat.converzen.de"` | cvz-chat API base URL |
 | `apiKey` | `string` | No* | - | Direct API key (insecure/demo mode) |
 | `getToken` | `(clientId: string) => Promise<string \| TokenResponse>` | No* | - | Returns a JWT to use in secure mode - see [Per-visitor rate limiting](#per-visitor-rate-limiting-clientid) |
-| `onSaveMessages` | `(sessionId: string, messages: ChatMessage[]) => Promise<void>` | No | built-in localStorage persistence | Called after every completed exchange, error, and history clear - see [Message persistence](#message-persistence) |
-| `onLoadMessages` | `() => Promise<{ sessionId: string, messages: ChatMessage[] }>` | No | built-in localStorage persistence | Called once on mount to restore history |
+| `persistMessages` | `boolean` | No | `true` | Persist conversation history to localStorage - see [Message persistence](#message-persistence) |
 | `headerMsg` | `string` | No | `"Support Chat"` | Header title |
 | `subheaderMsg` | `string` | No | `"We typically reply in a few minutes"` | Header subtitle |
 | `initialGreeting` | `string` | No | `"Hi, how can I help you ?"` | Shown when there's no history to restore |
@@ -322,7 +300,7 @@ Restyles the header, message bubbles, input, and Markdown content for a dark bac
 
 *Either `apiKey` or `getToken` must be provided.
 
-`sessionId` from earlier versions of this doc is not a config option - the session is tracked internally and handed to you via `onSaveMessages`/`onLoadMessages` instead.
+`sessionId` is not a config option - the session is tracked internally, and persisted (or not) per `persistMessages`, see [Message persistence](#message-persistence).
 
 ### `ChatMessage`
 
@@ -396,8 +374,6 @@ interface TokenResponse {
 cvzWidget.init({
   chatUrl: "https://chat.converzen.de",
   apiKey: "sk_test_your_key",
-  onSaveMessages: async (sessionId, messages) => console.log("Saving:", sessionId, messages),
-  onLoadMessages: async () => ({ sessionId: '', messages: [] }),
 });
 ```
 
@@ -411,23 +387,12 @@ cvzWidget.init({
     const { token } = await res.json();
     return token;
   },
-  onSaveMessages: async (sessionId, messages) => {
-    await fetch('/api/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, messages })
-    });
-  },
-  onLoadMessages: async () => {
-    const res = await fetch('/api/messages');
-    return res.json(); // { sessionId, messages }
-  },
   headerMsg: "Support",
   initialGreeting: "Hi! How can we help?"
 });
 ```
 
-### Example 3: Custom Styling
+### Example 3: Custom Styling, Session-Only History
 
 ```javascript
 cvzWidget.init({
@@ -443,8 +408,7 @@ cvzWidget.init({
       open: '#374151'
     }
   },
-  onSaveMessages: async () => {},
-  onLoadMessages: async () => ({ sessionId: '', messages: [] })
+  persistMessages: false, // fresh conversation every reload, nothing in localStorage
 });
 ```
 
