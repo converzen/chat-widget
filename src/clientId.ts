@@ -25,6 +25,23 @@ const INVALID_CLIENT_ID_MESSAGES = [
 
 type CaptchaProvider = 'recaptcha_v3' | 'turnstile';
 
+/**
+ * Lets a caller (App.tsx) give the captcha flow a real, visible place in its
+ * own UI to render into, and know when to show/hide it. Turnstile is the
+ * only provider that uses `getContainer` - it needs an actual container
+ * element to render into, unlike reCAPTCHA v3's containerless `execute()`.
+ * A hidden or off-screen container measurably hurts Turnstile's own
+ * bot-likelihood scoring (confirmed live: 0 solves out of 24 challenges run
+ * off-screen) - Cloudflare's challenge appears to weigh whether it ran
+ * somewhere a real visitor could ever actually see it.
+ */
+export interface CaptchaMount {
+  /** Returns the live DOM node to render into, or `null` if not ready yet. */
+  getContainer?: () => HTMLElement | null;
+  /** `true` right before rendering a challenge into that container, `false` once it resolves (token or error) - drives showing/hiding UI around it. */
+  onPending?: (pending: boolean) => void;
+}
+
 interface CaptchaRequiredResponse {
   error: string;
   provider: CaptchaProvider;
@@ -63,6 +80,7 @@ declare global {
           'error-callback'?: (error: unknown) => void;
         },
       ) => string;
+      remove: (widgetId: string) => void;
     };
   }
 }
@@ -182,38 +200,46 @@ function loadTurnstileScript(): Promise<void> {
   return turnstileScriptPromise;
 }
 
-async function getTurnstileToken(siteKey: string): Promise<string> {
+async function getTurnstileToken(siteKey: string, mount?: CaptchaMount): Promise<string> {
   await loadTurnstileScript();
   return new Promise((resolve, reject) => {
     if (!window.turnstile) {
       reject(new Error('turnstile unavailable after script load'));
       return;
     }
-    // Turnstile needs a real container element to render into, unlike
-    // reCAPTCHA v3's bare execute() - a real implementation difference, not
-    // just a different script URL. Positioned off-screen rather than
-    // display:none: a display:none subtree is frequently not part of the
-    // active render pipeline in most browsers (throttled/suspended
-    // rAF/timers, no layout), which breaks the legitimate-browser signals
-    // Cloudflare's iframe-based challenge relies on to pass a visitor -
-    // confirmed live (0/12 challenges solved, 100% flagged "likely bot"
-    // with display:none). Off-screen-but-laid-out keeps it fully live.
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.top = '-9999px';
-    container.style.left = '-9999px';
-    document.body.appendChild(container);
-    const cleanup = () => container.remove();
-    window.turnstile.render(container, {
+    // Prefer the caller's real, visible container (see CaptchaMount) - a
+    // hidden or off-screen one measurably hurts solve rates, confirmed live
+    // (0 solves out of 24 challenges with an off-screen container; 0 out of
+    // 12 before that with display:none). Falls back to a throwaway
+    // off-screen div only if the caller hasn't wired up a mount point -
+    // degrades rather than breaks, though solves are far less reliable
+    // there.
+    const provided = mount?.getContainer?.() ?? null;
+    const container = provided ?? document.createElement('div');
+    const ownsContainer = !provided;
+    if (ownsContainer) {
+      container.style.position = 'fixed';
+      container.style.top = '-9999px';
+      container.style.left = '-9999px';
+      document.body.appendChild(container);
+    } else {
+      // Clear out any previous render (e.g. a prior failed attempt) before
+      // reusing this persistent, App-owned container.
+      container.replaceChildren();
+    }
+    let widgetId: string | undefined;
+    const cleanup = () => {
+      mount?.onPending?.(false);
+      if (widgetId) window.turnstile?.remove(widgetId);
+      if (ownsContainer) container.remove();
+    };
+    mount?.onPending?.(true);
+    widgetId = window.turnstile.render(container, {
       sitekey: siteKey,
       action: CAPTCHA_ACTION,
       // No `size` here - Cloudflare rejects "invisible" as a value (only
       // normal/compact/flexible are valid); whether this ever surfaces an
       // interactive checkbox is decided by the site key's own Widget Mode.
-      // Off-screen positioning fixes rendering, not solvability - an
-      // interactive (Managed) site key can still require a click a visitor
-      // will never see; that needs the key itself set to Invisible mode in
-      // the Cloudflare dashboard, which this code can't detect or fix.
       callback: (token) => {
         resolve(token);
         cleanup();
@@ -226,10 +252,10 @@ async function getTurnstileToken(siteKey: string): Promise<string> {
   });
 }
 
-function getCaptchaToken(provider: CaptchaProvider, siteKey: string): Promise<string> {
+function getCaptchaToken(provider: CaptchaProvider, siteKey: string, mount?: CaptchaMount): Promise<string> {
   return provider === 'recaptcha_v3'
     ? getRecaptchaToken(siteKey)
-    : getTurnstileToken(siteKey);
+    : getTurnstileToken(siteKey, mount);
 }
 
 function issueClientId(
@@ -265,8 +291,9 @@ function issueClientId(
  *
  * If the account requires a CAPTCHA, this transparently loads the right
  * provider's script (reCAPTCHA v3 or Cloudflare Turnstile - whichever the
- * account picked), solves an invisible/background challenge, and retries
- * once with the resulting token.
+ * account picked), solves a challenge (see `CaptchaMount` for giving
+ * Turnstile a real, visible place to render it), and retries once with the
+ * resulting token.
  *
  * A `null` return means an outright failure (network, or CAPTCHA
  * challenge failure) while `publicId` IS configured. Callers should still
@@ -277,6 +304,7 @@ function issueClientId(
 export async function getOrCreateClientId(
   baseUrl: string,
   publicId?: string,
+  mount?: CaptchaMount,
 ): Promise<string | null> {
   if (!publicId) {
     return generateLocalClientId();
@@ -295,7 +323,7 @@ export async function getOrCreateClientId(
       const body: unknown = await res.json();
       if (isCaptchaRequiredResponse(body)) {
         gated = true;
-        const token = await getCaptchaToken(body.provider, body.site_key);
+        const token = await getCaptchaToken(body.provider, body.site_key, mount);
         res = await issueClientId(baseUrl, publicId, token);
       } else {
         console.warn('cvzWidget: client_id issuance failed (400)');
@@ -344,6 +372,7 @@ export async function getOrCreateClientId(
 export async function refreshClientIdAfterRejection(
   baseUrl: string,
   publicId?: string,
+  mount?: CaptchaMount,
 ): Promise<string | null> {
   if (!publicId) {
     // The rejected id was the legacy self-generated one, or there's no
@@ -367,5 +396,5 @@ export async function refreshClientIdAfterRejection(
   // faster than the cooldown either.
   writeStorage(LAST_FORCED_REISSUE_STORAGE_KEY, String(Date.now()));
   clearStorage(SERVER_CLIENT_ID_STORAGE_KEY);
-  return getOrCreateClientId(baseUrl, publicId);
+  return getOrCreateClientId(baseUrl, publicId, mount);
 }

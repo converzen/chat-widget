@@ -6,7 +6,7 @@ import type { CSSProperties } from 'preact/compat';
 import {TokenResponse, WidgetConfig, WidgetStyle, WidgetIcons} from './index';
 import { ChatMessage } from './types';
 import { streamChat } from './services/streaming';
-import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterRejection } from './clientId';
+import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterRejection, type CaptchaMount } from './clientId';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -473,10 +473,20 @@ const App = ({ config }: AppProps) => {
   // Memoized so a client_id fetched from cvz-chat only ever happens once
   // per widget mount, no matter how many call sites need it.
   const clientIdPromiseRef = useRef<Promise<string | null> | null>(null);
+  // Real, visible mount point for a CAPTCHA challenge (Turnstile only - see
+  // CaptchaMount) - rendered just above the message list, sized to nothing
+  // until captchaPending says otherwise. A hidden/off-screen container
+  // measurably hurts Turnstile's own solve rate, confirmed live.
+  const captchaContainerRef = useRef<HTMLDivElement>(null);
+  const [captchaPending, setCaptchaPending] = useState(false);
+  const captchaMount: CaptchaMount = {
+    getContainer: () => captchaContainerRef.current,
+    onPending: setCaptchaPending,
+  };
   const getClientId = (): Promise<string | null> => {
     if (!clientIdPromiseRef.current) {
       const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
-      clientIdPromiseRef.current = getOrCreateClientId(baseUrl, config.publicId);
+      clientIdPromiseRef.current = getOrCreateClientId(baseUrl, config.publicId, captchaMount);
     }
     return clientIdPromiseRef.current;
   };
@@ -522,12 +532,16 @@ const App = ({ config }: AppProps) => {
       }
     };
     loadHistory();
-    // Kick off client_id resolution at mount rather than on the user's
-    // first message - getClientId() memoizes, so this just means the
-    // round trip to cvz-chat overlaps page load instead of adding latency
-    // to sending.
-    void getClientId();
   }, [config]);
+  // client_id resolution is deliberately NOT kicked off here at mount -
+  // for a CAPTCHA-gated account that would run an invisible challenge the
+  // instant the page loads, before the visitor has done anything, which
+  // Cloudflare's own bot-likelihood scoring appears to penalize heavily
+  // (confirmed live: 0 solves either hidden or off-screen at page load).
+  // Deferred to the launcher click instead - see its onClick below -  so a
+  // CAPTCHA-gated challenge only ever runs once the panel is genuinely
+  // visible and the visitor has just taken a real action. getClientId()
+  // still memoizes, so reopening the panel doesn't repeat the resolution.
 
 
   // Helper function to get auth token with caching
@@ -576,7 +590,7 @@ const App = ({ config }: AppProps) => {
       }
       const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
       clientIdPromiseRef.current = Promise.resolve(
-        await refreshClientIdAfterRejection(baseUrl, config.publicId),
+        await refreshClientIdAfterRejection(baseUrl, config.publicId, captchaMount),
       );
       tokenResult = await fetchToken(); // one retry with the (possibly still-null) client_id
     }
@@ -979,6 +993,17 @@ const App = ({ config }: AppProps) => {
           icons={config.icons}
         />
 
+        {/* Turnstile's real mount point - see captchaMount. Collapsed to
+            nothing unless a CAPTCHA challenge is actually resolving, so
+            it's invisible for every account that doesn't gate client_id
+            issuance at all. */}
+        <div
+          ref={captchaContainerRef}
+          className={`cvz-flex cvz-justify-center cvz-overflow-hidden cvz-transition-all cvz-duration-200 ${
+            captchaPending ? 'cvz-max-h-32 cvz-py-2' : 'cvz-max-h-0 cvz-py-0'
+          }`}
+        />
+
         <ChatMessages
           messages={messages}
           isStreaming={isStreaming}
@@ -1005,7 +1030,15 @@ const App = ({ config }: AppProps) => {
 
       {/* Toggle Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          const next = !isOpen;
+          setIsOpen(next);
+          // Only start resolving client_id once the panel is actually
+          // opening, not on mount - see the comment above loadHistory's
+          // effect. getClientId() memoizes, so reopening is a no-op once
+          // it's already resolved once.
+          if (next) void getClientId();
+        }}
         className={`
           cvz-flex cvz-items-center cvz-justify-center
           cvz-w-14 cvz-h-14 cvz-rounded-full cvz-shadow-lg cvz-transition-all cvz-duration-300
