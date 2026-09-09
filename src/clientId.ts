@@ -343,6 +343,9 @@ export async function getOrCreateClientId(
 
     const data = (await res.json()) as { client_id: string };
     writeStorage(SERVER_CLIENT_ID_STORAGE_KEY, data.client_id);
+    // Upgrade complete - the old self-generated value (if this browser ever
+    // had one, from before `publicId` was configured) is now dead weight.
+    clearStorage(LEGACY_CLIENT_ID_STORAGE_KEY);
     return data.client_id;
   } catch (err) {
     console.warn('cvzWidget: client_id issuance failed', err);
