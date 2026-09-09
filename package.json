@@ -3,17 +3,19 @@
   "version": "1.0.0",
   "description": "Drop-in chat widget SDK for ConverZen - Easy to integrate, customizable, and fully featured chat widget",
   "main": "./dist/cvz-widget.js",
+  "module": "./dist/cvz-widget.mjs",
   "browser": "./dist/cvz-widget.js",
   "exports": {
     ".": {
-      "import": "./dist/cvz-widget.js",
-      "require": "./dist/cvz-widget.js",
+      "import": {
+        "types": "./dist/cvz-widget.d.mts",
+        "default": "./dist/cvz-widget.mjs"
+      },
+      "require": {
+        "types": "./dist/cvz-widget.d.ts",
+        "default": "./dist/cvz-widget.js"
+      },
       "default": "./dist/cvz-widget.js"
-    },
-    "./markdown": {
-      "import": "./dist/cvz-widget-md.js",
-      "require": "./dist/cvz-widget-md.js",
-      "default": "./dist/cvz-widget-md.js"
     }
   },
   "types": "./dist/cvz-widget.d.ts",
@@ -25,7 +27,8 @@
     "dev": "npm run build && (tailwindcss -i ./src/styles/global.css -o ./src/styles/output.css --watch & tsup --watch)",
     "build": "tailwindcss -i ./src/styles/global.css -o ./src/styles/output.css && tsup",
     "lint": "eslint src",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepare": "npm run build"
   },
   "keywords": [
     "chat",

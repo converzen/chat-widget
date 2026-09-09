@@ -198,7 +198,55 @@ If `WidgetConfig.publicId` is set (the non-secret id from your ConverZen dashboa
 
 Conversation history persists to `localStorage` automatically - one shared key per origin, lightly obfuscated (Base64, not encryption - there's no key to speak of, since it would ship in this same public JS bundle either way; this stops a casual glance at localStorage in devtools, nothing that resists real intent). Set `persistMessages: false` for session-only history instead - nothing written, nothing restored, a fresh conversation on every reload.
 
-There's no way to plug in your own backend, cross-device sync, or analytics for this - `persistMessages` is the only lever, on (`localStorage`) or off (nothing).
+For your own backend, cross-device sync, or analytics, supply `onSaveMessages`/`onLoadMessages` instead - either one takes priority over the built-in `persistMessages` behavior when supplied:
+
+```javascript
+cvzWidget.init({
+  // ...
+  onSaveMessages: async (sessionId, messages) => {
+    await fetch('/api/chat-history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, messages }),
+    });
+  },
+  onLoadMessages: async () => {
+    const res = await fetch('/api/chat-history');
+    if (!res.ok) return { sessionId: '', messages: [] };
+    return res.json(); // { sessionId, messages }
+  },
+});
+```
+
+`onLoadMessages` must return `sessionId: ''` (never a fabricated id) when there's nothing to restore - an id sent to `/continuation/stream` that cvz-chat has never heard of 404s there, surfacing as a confusing error on someone's very first message.
+
+### Extra context per message
+
+`extraContext` merges arbitrary fields verbatim into every completion/continuation request body - useful for grounding a conversation on something host-app-specific (e.g. RAG resource hints). Field names must match cvz-chat's wire format exactly, same as `persona`:
+
+```javascript
+cvzWidget.init({
+  // ...
+  extraContext: { mcp_resources: ['gmc:///reading/abc123'] },
+});
+```
+
+Unlike `persona` (first message of a session only), `extraContext` is sent on every call.
+
+### Opening the panel programmatically
+
+`autoOpen: true` starts the chat panel already open on mount, instead of waiting for a launcher click. Combine it with re-initializing the widget (`cvzWidget.hide()` then `cvzWidget.init({...})`) to pop the panel open with different config/context from your own UI:
+
+```javascript
+function openChatFor(topic) {
+  window.cvzWidget.hide();
+  window.cvzWidget.init({
+    ...baseConfig,
+    autoOpen: true,
+    extraContext: { mcp_resources: [`myapp:///topic/${topic}`] },
+  });
+}
+```
 
 ### Persona Selection
 
@@ -297,6 +345,10 @@ Restyles the header, message bubbles, input, and Markdown content for a dark bac
 | `enableMarkdown` | `boolean` | No | `false` | Render assistant messages as Markdown/GFM |
 | `style` | `WidgetStyle` | No | - | Styling customization |
 | `icons` | `WidgetIcons` | No | - | Icon overrides |
+| `onSaveMessages` | `(sessionId: string, messages: ChatMessage[]) => Promise<void>` | No | - | Your own history backend - see [Message persistence](#message-persistence) |
+| `onLoadMessages` | `() => Promise<{sessionId: string, messages: ChatMessage[]}>` | No | - | Your own history backend - see [Message persistence](#message-persistence) |
+| `extraContext` | `Record<string, unknown>` | No | - | Extra fields merged into every completion/continuation request - see [Extra context per message](#extra-context-per-message) |
+| `autoOpen` | `boolean` | No | `false` | Start the panel open on mount - see [Opening the panel programmatically](#opening-the-panel-programmatically) |
 
 *Either `apiKey` or `getToken` must be provided.
 

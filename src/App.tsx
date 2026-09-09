@@ -486,7 +486,7 @@ const ChatInput = ({
 // --- Main App ---
 
 const App = ({ config }: AppProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(config.autoOpen ?? false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -518,13 +518,16 @@ const App = ({ config }: AppProps) => {
     setEndUserAuth(null);
   };
 
+  // WidgetConfig.onSaveMessages/onLoadMessages (a host app's own backend,
+  // e.g. cross-device sync for a logged-in user) take priority over the
+  // built-in persistMessages/localStorage default when supplied.
   // WidgetConfig.persistMessages (default true) - false means session-only:
   // nothing written, nothing restored, a fresh conversation every reload.
   const persistMessages = config.persistMessages !== false;
-  const saveMessages = persistMessages ? defaultSaveMessages : async () => {};
-  const loadMessages = persistMessages
-    ? defaultLoadMessages
-    : async () => ({ sessionId: '', messages: [] });
+  const saveMessages = config.onSaveMessages
+    ?? (persistMessages ? defaultSaveMessages : async () => {});
+  const loadMessages = config.onLoadMessages
+    ?? (persistMessages ? defaultLoadMessages : async () => ({ sessionId: '', messages: [] }));
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -713,6 +716,7 @@ const App = ({ config }: AppProps) => {
           authToken: auth.token,
           authType: auth.type,
           clientId: (await getClientId()) ?? undefined,
+          extraContext: config.extraContext,
           abortSignal: abortController.signal,
         });
 

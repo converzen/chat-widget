@@ -13,6 +13,11 @@ export interface StreamChatParams {
     // apiKey mode - bearer/JWT mode carries it as a claim baked in when the
     // token was minted (see getToken in WidgetConfig), not per-request.
     clientId?: string;
+    // Arbitrary extra fields merged into the request body verbatim (see
+    // WidgetConfig.extraContext) - e.g. a host app's own RAG-grounding
+    // hints. Sent on every completion/continuation call, unlike `persona`
+    // which only applies to the first message of a session.
+    extraContext?: Record<string, unknown>;
 }
 
 
@@ -97,7 +102,7 @@ function parseSSEBuffer(buffer: string): StreamingData[] {
 export async function* streamChat(
   params: StreamChatParams
 ): AsyncGenerator<StreamingData, void, unknown> {
-  const { baseUrl, message, sessionId, persona, authToken, authType, maxTokens, clientId, abortSignal } = params;
+  const { baseUrl, message, sessionId, persona, authToken, authType, maxTokens, clientId, extraContext, abortSignal } = params;
 
   // Build headers
   const headers: Record<string, string> = {
@@ -136,6 +141,10 @@ export async function* streamChat(
 
   if (maxTokens) {
     body.max_tokens = maxTokens;
+  }
+
+  if (extraContext) {
+    Object.assign(body, extraContext);
   }
 
   let path;
