@@ -79,8 +79,12 @@ export interface WidgetConfig {
   // turned on for your account.
   // Existing zero-arg implementations keep working unchanged.
   getToken?: (clientId: string | null) => Promise<string | TokenResponse>;
-  onSaveMessages: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
-  onLoadMessages: () => Promise<{sessionId: string, messages: ChatMessage[]}>;
+  // Optional - omit both to use the widget's own built-in persistence
+  // (localStorage, lightly obfuscated, one shared key per origin). Supply
+  // your own only if you need a backend, analytics, or storage the built-in
+  // default doesn't cover; existing implementations keep working unchanged.
+  onSaveMessages?: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
+  onLoadMessages?: () => Promise<{sessionId: string, messages: ChatMessage[]}>;
   headerMsg?: string;
   subheaderMsg?: string; // Optional subheader text below the title (default: "We typically reply in a few minutes")
   initialGreeting?: string;

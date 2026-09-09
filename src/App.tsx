@@ -7,6 +7,7 @@ import {TokenResponse, WidgetConfig, WidgetStyle, WidgetIcons} from './index';
 import { ChatMessage } from './types';
 import { streamChat } from './services/streaming';
 import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterRejection, type CaptchaMount } from './clientId';
+import { defaultSaveMessages, defaultLoadMessages } from './history';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -480,6 +481,11 @@ const App = ({ config }: AppProps) => {
   const [activeToolCall, setActiveToolCall] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
+  // Fall back to the built-in, localStorage-backed persistence whenever the
+  // integrator hasn't supplied their own - see WidgetConfig.onSaveMessages.
+  const onSaveMessages = config.onSaveMessages ?? defaultSaveMessages;
+  const onLoadMessages = config.onLoadMessages ?? defaultLoadMessages;
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const tokenCacheRef = useRef<TokenResponse  | null>(null);
@@ -513,7 +519,7 @@ const App = ({ config }: AppProps) => {
   useEffect(() => {
     const loadHistory = async () => {
       try {
-        const result = await config.onLoadMessages();
+        const result = await onLoadMessages();
         let initialMessages: ChatMessage[] = [];
         let loadedSessionId: string | null = null;
 
@@ -774,7 +780,7 @@ const App = ({ config }: AppProps) => {
                 isFinalizingRef.current = false;
               }, 0);
 
-              await config.onSaveMessages(currentSessionId, finalMessages);
+              await onSaveMessages(currentSessionId, finalMessages);
             } else {
               setStreamingMessage('');
               thinkingBufferRef.current = '';
@@ -809,7 +815,7 @@ const App = ({ config }: AppProps) => {
             const errorMessages = [...updatedMessages, errorMessage];
             setMessages(errorMessages);
             // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
-            await config.onSaveMessages(currentSessionId || '', errorMessages);
+            await onSaveMessages(currentSessionId || '', errorMessages);
             setStreamingMessage('');
             thinkingBufferRef.current = '';
             setThinkingMessage('');
@@ -917,7 +923,7 @@ const App = ({ config }: AppProps) => {
       const errorMessages = [...updatedMessages, errorMessage];
       setMessages(errorMessages);
       // Pass sessionId to onSaveMessages (use current sessionId or empty string if null)
-      await config.onSaveMessages(sessionId || '', errorMessages);
+      await onSaveMessages(sessionId || '', errorMessages);
       setStreamingMessage('');
       thinkingBufferRef.current = '';
       setThinkingMessage('');
@@ -951,7 +957,7 @@ const App = ({ config }: AppProps) => {
       setIsLoading(false);
       // Clear persisted session ID
       // Pass sessionId to onSaveMessages (empty string since we're clearing)
-      await config.onSaveMessages('', []);
+      await onSaveMessages('', []);
     }
   };
 

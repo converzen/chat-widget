@@ -158,7 +158,10 @@ cvzWidget.init({
     return data.token; // a raw JWT string, or { token, expiresAt } - see below
   },
 
-  // Message persistence - both are required
+  // Message persistence - both optional. Omit both to use the widget's own
+  // built-in persistence (localStorage, lightly obfuscated) - see below.
+  // Supply your own only if you need a backend, analytics, or storage the
+  // built-in default doesn't cover.
   onSaveMessages: async (sessionId, messages) => {
     // Save to your backend or local storage
   },
@@ -211,6 +214,12 @@ On a 401/403 from the chat API, the widget clears its cached token, calls `getTo
 If your `getToken` throws/rejects with cvz-chat's own `get_token` error text (`invalid client_id` or `client_id does not belong to this account` - see the example above, which forwards it as-is), the widget treats that as its client_id being stale rather than a generic failure: it discards the cached one, requests a fresh one from cvz-chat, and retries `getToken` once more with it. This is throttled to once an hour per browser for accounts with no CAPTCHA on client_id issuance, so a durably-invalid id (e.g. after a server-side key rotation) can't turn into a request on every message; accounts that do require a CAPTCHA aren't throttled this way, since solving one is itself the cost gate. If your backend doesn't propagate that exact error text, this recovery step simply never triggers - no different from before it existed.
 
 If `WidgetConfig.publicId` is set (the non-secret id from your ConverZen dashboard), `clientId` is instead one cvz-chat itself issued and vouches for - see the "Client ID Protocol" design - rather than a self-generated value. Resolution starts when the visitor opens the widget (not on page load, so a CAPTCHA-gated account never runs a challenge before the visitor has done anything) and is memoized, so reopening doesn't repeat it. If your account requires a CAPTCHA, a small Cloudflare Turnstile or reCAPTCHA widget briefly appears above the message list while it resolves - deliberately real and visible rather than hidden, since a hidden or off-screen challenge measurably hurts its own solve rate. Without `publicId`, `clientId` falls back to the old self-generated, unverified value - no regression for integrations that haven't adopted it.
+
+#### Message persistence
+
+`onSaveMessages`/`onLoadMessages` are both optional. Omit them and the widget persists history to `localStorage` itself, under its own key, lightly obfuscated (Base64, not encryption - there's no key to speak of, since it would ship in this same public JS bundle either way; this stops a casual glance at localStorage in devtools, nothing that resists real intent). One shared key per origin, same as `clientId` - if you run multiple personas on one page and want separate histories per persona, supply your own callbacks instead.
+
+Supply your own when you need a backend, cross-device sync, analytics, or anything the built-in default doesn't cover. If you do, take care that a fresh visitor's `onLoadMessages` returns `sessionId: ''` (never a client-generated id) - the widget sends a non-empty `sessionId` to `POST /api/chat/continuation/stream` as an existing session, and a session cvz-chat has never actually created there 404s, surfacing as a confusing "temporarily unavailable" error on someone's very first message.
 
 ### Persona Selection
 
@@ -299,8 +308,8 @@ Restyles the header, message bubbles, input, and Markdown content for a dark bac
 | `chatUrl` | `string` | No | `"https://chat.converzen.de"` | cvz-chat API base URL |
 | `apiKey` | `string` | No* | - | Direct API key (insecure/demo mode) |
 | `getToken` | `(clientId: string) => Promise<string \| TokenResponse>` | No* | - | Returns a JWT to use in secure mode - see [Per-visitor rate limiting](#per-visitor-rate-limiting-clientid) |
-| `onSaveMessages` | `(sessionId: string, messages: ChatMessage[]) => Promise<void>` | Yes | - | Called after every completed exchange, error, and history clear |
-| `onLoadMessages` | `() => Promise<{ sessionId: string, messages: ChatMessage[] }>` | Yes | - | Called once on mount to restore history |
+| `onSaveMessages` | `(sessionId: string, messages: ChatMessage[]) => Promise<void>` | No | built-in localStorage persistence | Called after every completed exchange, error, and history clear - see [Message persistence](#message-persistence) |
+| `onLoadMessages` | `() => Promise<{ sessionId: string, messages: ChatMessage[] }>` | No | built-in localStorage persistence | Called once on mount to restore history |
 | `headerMsg` | `string` | No | `"Support Chat"` | Header title |
 | `subheaderMsg` | `string` | No | `"We typically reply in a few minutes"` | Header subtitle |
 | `initialGreeting` | `string` | No | `"Hi, how can I help you ?"` | Shown when there's no history to restore |
