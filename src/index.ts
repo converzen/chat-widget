@@ -18,6 +18,12 @@ export {ChatMessage, ChatPersonaIdentifier};
 
 const HOST_ELEMENT_ID: string = 'cvz-widget-host'
 
+// Injected at build time by tsup.config.ts (esbuild `define`) - a short
+// "what am I actually looking at" tag, not user-facing. Check it via
+// `window.cvzWidget.buildId` in devtools, or the one console line init()
+// prints.
+declare const __CVZ_BUILD_ID__: string;
+
 
 export interface TokenResponse {
   token: string;
@@ -100,6 +106,7 @@ export interface WidgetConfig {
 
 class WidgetManager {
     private hostElement: HTMLDivElement | null = null;
+    readonly buildId: string = __CVZ_BUILD_ID__;
 
     init(config: WidgetConfig) {
         if (this.hostElement) {
@@ -107,7 +114,7 @@ class WidgetManager {
             return;
         }
 
-        console.log('init: Initializing cvzWidget...');
+        console.log('init: Initializing cvzWidget...', this.buildId);
         console.log('CSS Length:', styles.length); // Debug log
 
         // Create the host element
