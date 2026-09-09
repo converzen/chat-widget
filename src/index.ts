@@ -105,6 +105,13 @@ export interface WidgetConfig {
   style?: WidgetStyle; // Optional styling customization
   icons?: WidgetIcons; // Optional icon overrides (default: built-in outline icon set)
   enableMarkdown?: boolean; // Optional - enable markdown rendering in messages (default: false). Requires markdown build.
+  // Enables ConverZen's own end-user subscription/credits monetization: a
+  // persistent "Authenticate" control in the header that lets a visitor log
+  // in via emailed magic link, see their vToken balance/renewal, and buy a
+  // plan - independent of this widget's own apiKey/getToken tenant auth.
+  // Default false (no UI, no behavior change) - only turn this on for
+  // accounts that have set up end-user billing plans in the dashboard.
+  endUserLicensing?: boolean;
 }
 
 class WidgetManager {

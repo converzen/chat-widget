@@ -8,6 +8,18 @@ import { ChatMessage } from './types';
 import { streamChat } from './services/streaming';
 import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterRejection, type CaptchaMount } from './clientId';
 import { defaultSaveMessages, defaultLoadMessages } from './history';
+import {
+  clearEndUserAuth,
+  isEndUserAuthValid,
+  loadEndUserAuth,
+  loadLastKnownEmail,
+  loadPendingCheckout,
+  clearPendingCheckout,
+  saveEndUserAuth,
+  waitForEndUserAction,
+  type EndUserAuth,
+} from './endUserAuth';
+import { EndUserAuthModal } from './EndUserAuthModal';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -152,7 +164,8 @@ const ChatHeader = ({
   onClose,
   onClear,
   darkMode,
-  icons
+  icons,
+  authControl,
 }: {
   title: string;
   subtitle?: string;
@@ -160,6 +173,7 @@ const ChatHeader = ({
   onClear: () => void;
   darkMode?: boolean;
   icons?: WidgetIcons;
+  authControl?: ReactNode;
 }) => (
   <div className={`cvz-p-4 cvz-shadow-md cvz-flex cvz-justify-between cvz-items-start ${
     darkMode 
@@ -180,8 +194,9 @@ const ChatHeader = ({
         }`}>{subtitle}</p>}
       </div>
     </div>
-    <div className="cvz-flex cvz-gap-2">
-      <button 
+    <div className="cvz-flex cvz-gap-2 cvz-items-center">
+      {authControl}
+      <button
         onClick={onClear}
         className={`cvz-transition-colors cvz-p-1 cvz-rounded-md ${
           darkMode 
@@ -481,6 +496,28 @@ const App = ({ config }: AppProps) => {
   const [activeToolCall, setActiveToolCall] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
+  // ConverZen-owned end-user identity (WidgetConfig.endUserLicensing) -
+  // independent of this widget's own apiKey/getToken tenant auth. `null`
+  // means no visitor identity yet (or it expired) - the widget then behaves
+  // exactly as it does with endUserLicensing off.
+  const [endUserAuth, setEndUserAuth] = useState<EndUserAuth | null>(() => {
+    const stored = loadEndUserAuth();
+    return isEndUserAuthValid(stored) ? stored : null;
+  });
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAuthNudge, setShowAuthNudge] = useState(false);
+
+  const authenticateEndUser = (auth: EndUserAuth) => {
+    saveEndUserAuth(auth);
+    setEndUserAuth(auth);
+    setShowAuthNudge(false);
+  };
+
+  const deauthenticateEndUser = () => {
+    clearEndUserAuth();
+    setEndUserAuth(null);
+  };
+
   // WidgetConfig.persistMessages (default true) - false means session-only:
   // nothing written, nothing restored, a fresh conversation every reload.
   const persistMessages = config.persistMessages !== false;
@@ -565,9 +602,26 @@ const App = ({ config }: AppProps) => {
   // visible and the visitor has just taken a real action. getClientId()
   // still memoizes, so reopening the panel doesn't repeat the resolution.
 
+  // Resumes a checkout that redirected this same tab away and back (or
+  // reloaded it) - `wait` checks the durable pending_action row first, so
+  // this resolves immediately even though the SSE connection that would
+  // have been open before navigating is long gone.
+  useEffect(() => {
+    if (!config.endUserLicensing) return;
+    const pending = loadPendingCheckout();
+    if (!pending) return;
+    const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
+    waitForEndUserAction(baseUrl, pending.pendingId).finally(() => {
+      clearPendingCheckout();
+    });
+  }, []);
 
-  // Helper function to get auth token with caching
-  const getAuthToken = async (forceRefresh = false): Promise<{ token: string; type: 'apiKey' | 'bearer' }> => {
+  // The widget's own tenant-level auth (apiKey or getToken bearer) - used
+  // for the end-user login flow's start_login/plans calls, which need to
+  // identify the *account*, not a visitor who may not have an identity yet.
+  // Kept separate from getAuthToken below so an active end-user session
+  // never shadows it.
+  const getTenantAuthToken = async (forceRefresh = false): Promise<{ token: string; type: 'apiKey' | 'bearer' }> => {
     // console.log(`getAuthToken: force: ${forceRefresh}`)
     if (config.apiKey) {
       return { token: config.apiKey, type: 'apiKey' };
@@ -620,6 +674,16 @@ const App = ({ config }: AppProps) => {
     tokenCacheRef.current = tokenResult;
 
     return { token: tokenResult.token, type: 'bearer' };
+  };
+
+  // Effective auth for chat calls - an authenticated end-user identity
+  // (magic-link login) takes priority over this widget's own tenant-level
+  // apiKey/getToken, since it carries the visitor's own purchased balance.
+  const getAuthToken = async (forceRefresh = false): Promise<{ token: string; type: 'apiKey' | 'bearer' }> => {
+    if (!forceRefresh && isEndUserAuthValid(endUserAuth)) {
+      return { token: endUserAuth.token, type: 'bearer' };
+    }
+    return getTenantAuthToken(forceRefresh);
   };
 
   // Helper function to execute streaming with retry on auth errors
@@ -798,17 +862,38 @@ const App = ({ config }: AppProps) => {
           case 'error':
             const errorCode = event.code || '';
             const errorMsg = event.message || event.detail || '';
+            const wasUsingEndUserAuth = retryCount === 0 && isEndUserAuthValid(endUserAuth);
 
-            if ((errorCode === 'auth_failed' || errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('Unauthorized') || errorMsg.includes('Forbidden')) && 
-                retryCount < maxRetries && 
-                config.getToken && 
-                !config.apiKey) {
+            if ((errorCode === 'auth_failed' || errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('Unauthorized') || errorMsg.includes('Forbidden')) &&
+                retryCount < maxRetries &&
+                ((config.getToken && !config.apiKey) || wasUsingEndUserAuth)) {
               console.warn('Auth error detected, refreshing token and retrying...');
               tokenCacheRef.current = null;
+              if (wasUsingEndUserAuth) {
+                // The visitor's own token was rejected (expired/revoked
+                // server-side) - fall back to this widget's tenant auth on
+                // retry rather than looping on the same bad token, and drop
+                // the stale identity so the header reverts to "Authenticate".
+                deauthenticateEndUser();
+              }
               hasUnauthorizedError = true;
               break;
             }
-            
+
+            if (errorCode === 'rate_limited' && config.endUserLicensing) {
+              // A real nudge banner, not a chat bubble - the Authenticate
+              // control is what actually resolves this.
+              setShowAuthNudge(true);
+              setStreamingMessage('');
+              thinkingBufferRef.current = '';
+              setThinkingMessage('');
+              setActiveToolCall(null);
+              setIsStreaming(false);
+              setIsLoading(false);
+              abortControllerRef.current = null;
+              return;
+            }
+
             console.error('Stream error:', errorCode, errorMsg);
             const errorMessage: ChatMessage = {
               content: errorMsg || 'An error occurred',
@@ -850,17 +935,20 @@ const App = ({ config }: AppProps) => {
 
     } catch (error) {
       // Check if it's an unauthorized error from fetch
-      if (error instanceof Error && 
+      const wasUsingEndUserAuth = retryCount === 0 && isEndUserAuthValid(endUserAuth);
+      if (error instanceof Error &&
           (error.message.includes('401') || error.message.includes('403')) &&
-          retryCount < maxRetries && 
-          config.getToken && 
-          !config.apiKey) {
+          retryCount < maxRetries &&
+          ((config.getToken && !config.apiKey) || wasUsingEndUserAuth)) {
         // Clear token cache and retry once
         console.warn('Unauthorized error detected, refreshing token and retrying...');
         tokenCacheRef.current = null;
+        if (wasUsingEndUserAuth) {
+          deauthenticateEndUser();
+        }
         return executeStreaming(userMessage, updatedMessages, abortController, retryCount + 1);
       }
-      
+
       throw error; // Re-throw if not a retryable auth error
     }
   };
@@ -1013,6 +1101,21 @@ const App = ({ config }: AppProps) => {
           onClear={handleClearHistory}
           darkMode={config.darkMode}
           icons={config.icons}
+          authControl={
+            config.endUserLicensing ? (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className={`cvz-text-xs cvz-font-medium cvz-px-2 cvz-py-1 cvz-rounded-md cvz-transition-colors cvz-whitespace-nowrap ${
+                  config.darkMode
+                    ? 'cvz-text-gray-200 hover:cvz-bg-gray-700/50'
+                    : 'cvz-text-white hover:cvz-bg-blue-600/50'
+                }`}
+                title={endUserAuth ? `Signed in as ${endUserAuth.email}` : 'Authenticate'}
+              >
+                {endUserAuth ? 'Account' : 'Authenticate'}
+              </button>
+            ) : undefined
+          }
         />
 
         {/* Turnstile's real mount point - see captchaMount. Collapsed to
@@ -1039,6 +1142,20 @@ const App = ({ config }: AppProps) => {
           icons={config.icons}
         />
 
+        {showAuthNudge && !isEndUserAuthValid(endUserAuth) && (
+          <div className={`cvz-px-4 cvz-py-2 cvz-text-xs cvz-flex cvz-items-center cvz-justify-between cvz-gap-2 ${
+            config.darkMode ? 'cvz-bg-amber-900/40 cvz-text-amber-200' : 'cvz-bg-amber-50 cvz-text-amber-800'
+          }`}>
+            <span>You've reached the free limit - authenticate to keep chatting.</span>
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="cvz-underline cvz-font-medium cvz-shrink-0"
+            >
+              Authenticate
+            </button>
+          </div>
+        )}
+
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
@@ -1048,6 +1165,19 @@ const App = ({ config }: AppProps) => {
           darkMode={config.darkMode}
           icons={config.icons}
         />
+
+        {config.endUserLicensing && (
+          <EndUserAuthModal
+            open={showAuthModal}
+            onClose={() => setShowAuthModal(false)}
+            darkMode={config.darkMode}
+            baseUrl={config.chatUrl || DEFAULT_CHAT_API_URL}
+            getBaseAuth={() => getTenantAuthToken()}
+            endUserAuth={endUserAuth}
+            onAuthenticated={authenticateEndUser}
+            initialEmail={loadLastKnownEmail() ?? undefined}
+          />
+        )}
       </div>
 
       {/* Toggle Button */}
