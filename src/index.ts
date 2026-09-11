@@ -13,8 +13,12 @@ if (options) {
   };
 }
 import styles from './styles/output.css';
-import { ChatMessage, ChatPersonaIdentifier } from "@/types";
+import { ChatMessage, ChatPersonaIdentifier, TokenResponse, WidgetConfig, WidgetStyle, WidgetIcons } from "@/types";
 export {ChatMessage, ChatPersonaIdentifier};
+// WidgetConfig/WidgetStyle/WidgetIcons/TokenResponse now live in ./types (see
+// core/chatCore.ts for why) - re-exported here so this stays a
+// backward-compatible import site for existing consumers of the default entry.
+export type {TokenResponse, WidgetConfig, WidgetStyle, WidgetIcons};
 
 const HOST_ELEMENT_ID: string = 'cvz-widget-host'
 
@@ -24,111 +28,31 @@ const HOST_ELEMENT_ID: string = 'cvz-widget-host'
 // prints.
 declare const __CVZ_BUILD_ID__: string;
 
+/**
+ * Shared Shadow-DOM mounting sequence, parameterized on which component to
+ * render - used by the default WidgetManager below, and reusable by anyone
+ * building their own thin manager around a different presentation. A
+ * consumer with its own React/Next.js presentation doesn't need this at all
+ * - it renders as a normal component in its own tree instead (no Shadow DOM
+ * isolation needed on a page you already control the CSS of).
+ */
+function mountApp(config: WidgetConfig, AppComponent: typeof App): HTMLDivElement {
+    const hostElement = document.createElement('div');
+    hostElement.id = HOST_ELEMENT_ID;
+    document.body.appendChild(hostElement);
 
-export interface TokenResponse {
-  token: string;
-  expiresAt?: number; // Unix timestamp in milliseconds. Omit for a token that never expires.
-}
+    const shadowRoot = hostElement.attachShadow({mode: 'open'});
 
-export interface WidgetStyle {
-  // Position: preset or custom
-  position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | {
-    bottom?: string; // e.g., "16px", "1rem"
-    top?: string;
-    left?: string;
-    right?: string;
-  };
-  
-  // Dialog size: preset or custom
-  dialogSize?: 'small' | 'medium' | 'large' | {
-    width: number; // pixels
-    height: number; // pixels
-  };
-  
-  // Frame/border color (hex)
-  frameColor?: string; // hex code, e.g., "#E5E7EB"
-  
-  // Button colors (hex codes)
-  buttonColor?: {
-    normal?: string; // hex code, e.g., "#2563EB"
-    hover?: string; // hex code, e.g., "#1D4ED8"
-    open?: string; // hex code, e.g., "#1F2937"
-  };
-}
+    const styleTag = document.createElement('style');
+    styleTag.textContent = styles;
+    shadowRoot.appendChild(styleTag);
 
-export interface WidgetIcons {
-  // Raw SVG (or other inline HTML) markup, inserted in place of the built-in icon.
-  // Use `stroke="currentColor"` / `fill="currentColor"` in your markup to inherit
-  // the surrounding icon color the same way the built-in icons do.
-  launcher?: string; // Closed launcher-button icon; also used for the empty-conversation placeholder
-  close?: string;    // Open launcher-button icon and the header's close-chat icon
-  send?: string;     // Message input's send-button icon
-  clear?: string;    // Header's clear-history icon
-}
+    const preactRootElement = document.createElement('div');
+    preactRootElement.id = 'cvz-root';
+    shadowRoot.appendChild(preactRootElement);
 
-export interface WidgetConfig {
-  apiKey?: string; // Direct API key (for insecure/demo mode) - uses X-API-Key header
-  // Returns a raw JWT string, or a TokenResponse with expiration. Receives the
-  // widget's per-browser client-id - forward it to your backend's
-  // POST /api/chat/get_token call (as `client_id`) so per-visitor rate
-  // limiting can identify this visitor across requests. `null` when no
-  // client_id is available right now (e.g. `publicId` isn't configured, or
-  // cvz-chat couldn't be reached to issue one) - forward it through as-is
-  // rather than substituting your own value; cvz-chat treats a missing
-  // client_id as "not yet provided", not as an error, until enforcement is
-  // turned on for your account.
-  // Existing zero-arg implementations keep working unchanged.
-  getToken?: (clientId: string | null) => Promise<string | TokenResponse>;
-  // Whether to persist conversation history across reloads at all - the
-  // widget's own localStorage, lightly obfuscated, one shared key per
-  // origin. Default true. Set false for session-only history (nothing
-  // written, nothing restored - a fresh conversation every page load).
-  persistMessages?: boolean;
-  headerMsg?: string;
-  subheaderMsg?: string; // Optional subheader text below the title (default: "We typically reply in a few minutes")
-  initialGreeting?: string;
-  promptPlaceholder?: string;
-  chatUrl?: string; // Optional - defaults to 'https://chat.converzen.de'
-  // The non-secret id (from your ConverZen dashboard, next to your API key)
-  // that lets the widget request a client_id directly from cvz-chat instead
-  // of generating one itself. Required to get a cvz-chat-issued,
-  // spoof-resistant client_id in getToken/JWT mode; without it the widget
-  // falls back to a self-generated one, same as before this existed.
-  publicId?: string;
-  // Optional persona/version selector. A plain string is shorthand for { alias: string }.
-  // Only takes effect in apiKey mode, and only on the first message of a new session -
-  // continuation requests reuse the persona the session was created with, and in
-  // getToken/JWT mode the persona is selected server-side when your backend requests
-  // the token (POST /api/get_token), not by the widget.
-  persona?: string | ChatPersonaIdentifier;
-  darkMode?: boolean; // Optional - enable dark mode theme (default: false)
-  style?: WidgetStyle; // Optional styling customization
-  icons?: WidgetIcons; // Optional icon overrides (default: built-in outline icon set)
-  enableMarkdown?: boolean; // Optional - enable markdown rendering in messages (default: false). Requires markdown build.
-  // Enables ConverZen's own end-user subscription/credits monetization: a
-  // persistent "Authenticate" control in the header that lets a visitor log
-  // in via emailed magic link, see their vToken balance/renewal, and buy a
-  // plan - independent of this widget's own apiKey/getToken tenant auth.
-  // Default false (no UI, no behavior change) - only turn this on for
-  // accounts that have set up end-user billing plans in the dashboard.
-  endUserLicensing?: boolean;
-  // Pluggable history persistence, for a host app that wants its own
-  // backend (e.g. cross-device sync for a logged-in user) instead of the
-  // built-in `persistMessages` localStorage default. Either callback takes
-  // priority over `persistMessages` when supplied; omit both to keep using
-  // the built-in behavior. `onLoadMessages` must return `sessionId: ''`
-  // (never a fabricated id) when there's nothing to restore - see
-  // src/history.ts's defaultLoadMessages for why.
-  onSaveMessages?: (sessionId: string, messages: ChatMessage[]) => Promise<void>;
-  onLoadMessages?: () => Promise<{ sessionId: string; messages: ChatMessage[] }>;
-  // Arbitrary extra fields merged verbatim into every completion/continuation
-  // request body - e.g. a host app's own RAG-grounding hints. Field names
-  // must match cvz-chat's wire format exactly, same as `persona`.
-  extraContext?: Record<string, unknown>;
-  // Start the chat panel already open on mount, instead of waiting for a
-  // launcher click - e.g. a host app's own "ask about this" button that
-  // re-inits the widget with different `extraContext`. Default false.
-  autoOpen?: boolean;
+    render(createElement(AppComponent, {config}), preactRootElement);
+    return hostElement;
 }
 
 class WidgetManager {
@@ -144,28 +68,7 @@ class WidgetManager {
         console.log('init: Initializing cvzWidget...', this.buildId);
         console.log('CSS Length:', styles.length); // Debug log
 
-        // Create the host element
-        const hostElement = document.createElement('div');
-        hostElement.id = HOST_ELEMENT_ID;
-        document.body.appendChild(hostElement);
-
-
-        // Attach Shadow DOM
-        const shadowRoot = hostElement.attachShadow({mode: 'open'});
-
-        // Inject Styles
-        const styleTag = document.createElement('style');
-        styleTag.textContent = styles;
-        shadowRoot.appendChild(styleTag);
-
-        // Create Preact Root
-        const preactRootElement = document.createElement('div');
-        preactRootElement.id = 'cvz-root';
-        shadowRoot.appendChild(preactRootElement);
-
-        // Render the App
-        render(createElement(App, {config}), preactRootElement);
-        this.hostElement = hostElement;
+        this.hostElement = mountApp(config, App);
     }
 
     // ... methods ...

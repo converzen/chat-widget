@@ -53,4 +53,40 @@ export default defineConfig([
       options.alias['react/jsx-runtime'] = 'preact/jsx-runtime';
     },
   },
+  {
+    // @converzen/chat-widget/core - framework-agnostic, zero runtime
+    // dependencies (no preact/react import anywhere in its graph). No react
+    // alias here - unlike the default entry above, this one must never
+    // touch Preact.
+    entry: {
+      core: 'src/core/index.ts',
+    },
+    format: ['esm', 'cjs'],
+    outDir: 'dist',
+    outExtension: ({ format }) => ({ js: format === 'esm' ? '.mjs' : '.js' }),
+    clean: false,
+    minify: true,
+    treeshake: true,
+    bundle: true,
+    dts: true,
+    platform: 'browser',
+  },
+  {
+    // @converzen/chat-widget/react - the React adapter. `react` stays
+    // external (a peer dependency, see package.json) so a consumer's own
+    // React instance is reused rather than a second copy getting bundled in.
+    entry: {
+      react: 'src/react/index.ts',
+    },
+    format: ['esm', 'cjs'],
+    outDir: 'dist',
+    outExtension: ({ format }) => ({ js: format === 'esm' ? '.mjs' : '.js' }),
+    clean: false,
+    minify: true,
+    treeshake: true,
+    bundle: true,
+    dts: true,
+    external: ['react'],
+    platform: 'browser',
+  },
 ]);

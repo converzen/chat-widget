@@ -2,24 +2,11 @@
 import { createElement } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ComponentChildren, RefObject } from 'preact';
-import type { CSSProperties } from 'preact/compat';
-import {TokenResponse, WidgetConfig, WidgetStyle, WidgetIcons} from './index';
-import { ChatMessage } from './types';
-import { streamChat } from './services/streaming';
-import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterRejection, type CaptchaMount } from './clientId';
-import { defaultSaveMessages, defaultLoadMessages } from './history';
-import {
-  clearEndUserAuth,
-  isEndUserAuthValid,
-  loadEndUserAuth,
-  loadLastKnownEmail,
-  loadPendingCheckout,
-  clearPendingCheckout,
-  saveEndUserAuth,
-  waitForEndUserAction,
-  type EndUserAuth,
-} from './endUserAuth';
+import { WidgetConfig, WidgetStyle, WidgetIcons, ChatMessage } from './types';
+import { isEndUserAuthValid, loadLastKnownEmail } from './endUserAuth';
 import { EndUserAuthModal } from './EndUserAuthModal';
+import { useChatCoreAdapter } from './useChatCoreAdapter';
+import { getPositionStyles, getDialogSize, getFrameColor, getButtonColors } from './styleHelpers';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -30,89 +17,10 @@ declare const __CVZ_BUILD_ID__: string;
 // and the timestamp half is too long to sit next to "Powered by ConverZen".
 const CVZ_BUILD_TAG = __CVZ_BUILD_ID__.split('-')[0];
 
-// --- Icons ---
+// Only used here for EndUserAuthModal's baseUrl fallback prop - chatCore.ts
+// has its own copy of this same constant for the same reason a single
+// string constant isn't worth sharing a module over.
 const DEFAULT_CHAT_API_URL = 'https://chat.converzen.de';
-const DEFAULT_INITIAL_GREETING: string = "Hi, how can I help you ?"
-// --- Style Helper Functions ---
-
-const getPositionStyles = (style?: WidgetStyle): CSSProperties => {
-  if (!style?.position) {
-    return { bottom: '1rem', right: '1rem' }; // Default: bottom-right
-  }
-
-  if (typeof style.position === 'string') {
-    // Preset positions
-    switch (style.position) {
-      case 'bottom-right':
-        return { bottom: '1rem', right: '1rem' };
-      case 'bottom-left':
-        return { bottom: '1rem', left: '1rem' };
-      case 'top-right':
-        return { top: '1rem', right: '1rem' };
-      case 'top-left':
-        return { top: '1rem', left: '1rem' };
-      default:
-        return { bottom: '1rem', right: '1rem' };
-    }
-  } else {
-    // Custom position
-    const pos: CSSProperties = {};
-    if (style.position.bottom) pos.bottom = style.position.bottom;
-    if (style.position.top) pos.top = style.position.top;
-    if (style.position.left) pos.left = style.position.left;
-    if (style.position.right) pos.right = style.position.right;
-    return pos;
-  }
-};
-
-const DIALOG_MAX_WIDTH = 'calc(100vw - 2rem)';
-const DIALOG_MAX_HEIGHT = 'calc(100dvh - 8rem)';
-
-const getDialogSize = (style?: WidgetStyle): CSSProperties => {
-  const responsive = { maxWidth: DIALOG_MAX_WIDTH, maxHeight: DIALOG_MAX_HEIGHT };
-
-  if (!style?.dialogSize) {
-    return { width: '350px', height: '500px', ...responsive };
-  }
-
-  if (typeof style.dialogSize === 'string') {
-    switch (style.dialogSize) {
-      case 'small':
-        return { width: '300px', height: '400px', ...responsive };
-      case 'medium':
-        return { width: '350px', height: '500px', ...responsive };
-      case 'large':
-        return { width: '400px', height: '600px', ...responsive };
-      default:
-        return { width: '350px', height: '500px', ...responsive };
-    }
-  } else {
-    return {
-      width: `${Math.max(250, style.dialogSize.width)}px`,
-      height: `${Math.max(300, style.dialogSize.height)}px`,
-      ...responsive,
-    };
-  }
-};
-
-const getFrameColor = (style?: WidgetStyle): string => {
-  return style?.frameColor || '#E5E7EB'; // Default: gray-200
-};
-
-const getButtonColors = (style?: WidgetStyle, isOpen?: boolean): CSSProperties => {
-  const colors = style?.buttonColor;
-  
-  if (isOpen) {
-    return {
-      backgroundColor: colors?.open || '#1F2937', // Default: gray-800
-    };
-  }
-  
-  return {
-    backgroundColor: colors?.normal || '#2563EB', // Default: blue-600
-    '--hover-color': colors?.hover || '#1D4ED8', // Default: blue-700
-  } as CSSProperties;
-};
 
 const ChatIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="cvz-w-6 cvz-h-6">
@@ -148,7 +56,6 @@ const IconSlot = ({ custom, fallback, className }: { custom?: string; fallback: 
 
 // --- Types ---
 
-
 interface AppProps {
   config: WidgetConfig;
 }
@@ -176,8 +83,8 @@ const ChatHeader = ({
   authControl?: ReactNode;
 }) => (
   <div className={`cvz-p-4 cvz-shadow-md cvz-flex cvz-justify-between cvz-items-start ${
-    darkMode 
-      ? 'cvz-bg-gradient-to-b cvz-from-gray-900 cvz-to-gray-800 cvz-text-white' 
+    darkMode
+      ? 'cvz-bg-gradient-to-b cvz-from-gray-900 cvz-to-gray-800 cvz-text-white'
       : 'cvz-bg-gradient-to-b cvz-from-blue-600 cvz-to-blue-500 cvz-text-white'
   }`}>
     <div className="cvz-flex cvz-items-center cvz-gap-3">
@@ -199,8 +106,8 @@ const ChatHeader = ({
       <button
         onClick={onClear}
         className={`cvz-transition-colors cvz-p-1 cvz-rounded-md ${
-          darkMode 
-            ? 'cvz-text-gray-400 cvz-hover:cvz-text-white cvz-hover:cvz-bg-gray-700/50' 
+          darkMode
+            ? 'cvz-text-gray-400 cvz-hover:cvz-text-white cvz-hover:cvz-bg-gray-700/50'
             : 'cvz-text-blue-200 cvz-hover:cvz-text-white cvz-hover:cvz-bg-blue-600/50'
         }`}
         title="Clear History"
@@ -223,12 +130,12 @@ const ChatHeader = ({
 );
 
 // MessageContent component that renders markdown (static import for markdown build)
-const MessageContent = ({ 
-  content, 
+const MessageContent = ({
+  content,
   enableMarkdown,
   darkMode
-}: { 
-  content: string; 
+}: {
+  content: string;
   enableMarkdown?: boolean;
   darkMode?: boolean;
 }) => {
@@ -257,8 +164,8 @@ const MessageContent = ({
             strong: ({ children }: any) => <strong className="cvz-font-bold">{children}</strong>,
             em: ({ children }: any) => <em className="cvz-italic">{children}</em>,
             a: ({ children, href }: any) => <a href={href} className={`cvz-underline ${
-              darkMode 
-                ? 'cvz-text-blue-400 cvz-hover:cvz-text-blue-300' 
+              darkMode
+                ? 'cvz-text-blue-400 cvz-hover:cvz-text-blue-300'
                 : 'cvz-text-blue-600 cvz-hover:cvz-text-blue-800'
             }`} target="_blank" rel="noopener noreferrer">{children}</a>,
             table: ({ children }: any) => (
@@ -340,11 +247,11 @@ const ChatMessages = ({
   }, [messages, streamingMessage, thinkingMessage, activeToolCall, shouldAutoScroll, messagesEndRef]);
 
   return (
-    <div 
+    <div
       ref={messagesContainerRef}
       className={`cvz-flex-1 cvz-overflow-y-auto cvz-p-4 cvz-space-y-4 ${
-        darkMode 
-          ? 'cvz-bg-gray-900 cvz-scrollbar-dark' 
+        darkMode
+          ? 'cvz-bg-gray-900 cvz-scrollbar-dark'
           : 'cvz-bg-gray-50 cvz-scrollbar-light'
       }`}
     >
@@ -441,8 +348,8 @@ const ChatInput = ({
   icons?: WidgetIcons;
 }) => (
   <form onSubmit={onSubmit} className={`cvz-p-4 cvz-border-t ${
-    darkMode 
-      ? 'cvz-bg-gray-800 cvz-border-gray-700' 
+    darkMode
+      ? 'cvz-bg-gray-800 cvz-border-gray-700'
       : 'cvz-bg-white cvz-border-gray-100'
   }`}>
     <div className="cvz-relative cvz-flex cvz-items-center">
@@ -484,575 +391,28 @@ const ChatInput = ({
 );
 
 // --- Main App ---
+// All auth/session/streaming logic lives in ./core/chatCore.ts now, reached
+// here via ./useChatCoreAdapter.ts (a thin preact/compat useSyncExternalStore
+// binding). This component is presentation only.
 
 const App = ({ config }: AppProps) => {
-  const [isOpen, setIsOpen] = useState(config.autoOpen ?? false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const core = useChatCoreAdapter(config);
   const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingMessage, setStreamingMessage] = useState('');
-  const [thinkingMessage, setThinkingMessage] = useState('');
-  const [activeToolCall, setActiveToolCall] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-
-  // ConverZen-owned end-user identity (WidgetConfig.endUserLicensing) -
-  // independent of this widget's own apiKey/getToken tenant auth. `null`
-  // means no visitor identity yet (or it expired) - the widget then behaves
-  // exactly as it does with endUserLicensing off.
-  const [endUserAuth, setEndUserAuth] = useState<EndUserAuth | null>(() => {
-    const stored = loadEndUserAuth();
-    return isEndUserAuthValid(stored) ? stored : null;
-  });
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showAuthNudge, setShowAuthNudge] = useState(false);
-
-  const authenticateEndUser = (auth: EndUserAuth) => {
-    saveEndUserAuth(auth);
-    setEndUserAuth(auth);
-    setShowAuthNudge(false);
-  };
-
-  const deauthenticateEndUser = () => {
-    clearEndUserAuth();
-    setEndUserAuth(null);
-  };
-
-  // WidgetConfig.onSaveMessages/onLoadMessages (a host app's own backend,
-  // e.g. cross-device sync for a logged-in user) take priority over the
-  // built-in persistMessages/localStorage default when supplied.
-  // WidgetConfig.persistMessages (default true) - false means session-only:
-  // nothing written, nothing restored, a fresh conversation every reload.
-  const persistMessages = config.persistMessages !== false;
-  const saveMessages = config.onSaveMessages
-    ?? (persistMessages ? defaultSaveMessages : async () => {});
-  const loadMessages = config.onLoadMessages
-    ?? (persistMessages ? defaultLoadMessages : async () => ({ sessionId: '', messages: [] }));
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const tokenCacheRef = useRef<TokenResponse  | null>(null);
-  // Memoized so a client_id fetched from cvz-chat only ever happens once
-  // per widget mount, no matter how many call sites need it.
-  const clientIdPromiseRef = useRef<Promise<string | null> | null>(null);
-  // Real, visible mount point for a CAPTCHA challenge (Turnstile only - see
-  // CaptchaMount) - rendered just above the message list, sized to nothing
-  // until captchaPending says otherwise. A hidden/off-screen container
-  // measurably hurts Turnstile's own solve rate, confirmed live.
-  const captchaContainerRef = useRef<HTMLDivElement>(null);
-  const [captchaPending, setCaptchaPending] = useState(false);
-  const captchaMount: CaptchaMount = {
-    getContainer: () => captchaContainerRef.current,
-    onPending: setCaptchaPending,
-  };
-  const getClientId = (): Promise<string | null> => {
-    if (!clientIdPromiseRef.current) {
-      const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
-      clientIdPromiseRef.current = getOrCreateClientId(baseUrl, config.publicId, captchaMount);
-    }
-    return clientIdPromiseRef.current;
-  };
-  const isFinalizingRef = useRef(false);
-  const streamBufferRef = useRef("");
-  const rAFRef = useRef<number | null>(null);
-  const thinkingBufferRef = useRef("");
-  const thinkingRAFRef = useRef<number | null>(null);
-
-  // Load messages and session ID on mount
-  useEffect(() => {
-    const loadHistory = async () => {
-      try {
-        const result = await loadMessages();
-        let initialMessages: ChatMessage[] = [];
-        let loadedSessionId: string | null = null;
-
-        // Handle the new return format: {sessionId: string, messages: ChatMessage[]}
-        if (result && typeof result === 'object' && 'messages' in result && 'sessionId' in result) {
-          initialMessages = result.messages || [];
-          loadedSessionId = result.sessionId || null;
-        } else if (Array.isArray(result)) {
-          // Fallback for backward compatibility (if someone returns just an array)
-          initialMessages = result;
-        }
-
-        // console.log(`loadHistory: sessionId: ${loadedSessionId}, messages: ${initialMessages.length} `)
-
-        // Show the greeting only when there's genuinely no history to restore -
-        // not merely because sessionId is missing (a legacy array-only return, or a
-        // {sessionId, messages} return with an empty sessionId, can still carry messages).
-        if (initialMessages.length === 0) {
-            initialMessages = [{
-                content: config.initialGreeting || DEFAULT_INITIAL_GREETING,
-                role: 'SYSTEM',
-                createdAt: new Date().toISOString(),
-            }];
-        }
-        setSessionId(loadedSessionId);
-        setMessages(initialMessages);
-      } catch (error) {
-        console.error('Failed to load messages:', error);
-      }
-    };
-    loadHistory();
-  }, [config]);
-  // client_id resolution is deliberately NOT kicked off here at mount -
-  // for a CAPTCHA-gated account that would run an invisible challenge the
-  // instant the page loads, before the visitor has done anything, which
-  // Cloudflare's own bot-likelihood scoring appears to penalize heavily
-  // (confirmed live: 0 solves either hidden or off-screen at page load).
-  // Deferred to the launcher click instead - see its onClick below -  so a
-  // CAPTCHA-gated challenge only ever runs once the panel is genuinely
-  // visible and the visitor has just taken a real action. getClientId()
-  // still memoizes, so reopening the panel doesn't repeat the resolution.
-
-  // Resumes a checkout that redirected this same tab away and back (or
-  // reloaded it) - `wait` checks the durable pending_action row first, so
-  // this resolves immediately even though the SSE connection that would
-  // have been open before navigating is long gone.
-  useEffect(() => {
-    if (!config.endUserLicensing) return;
-    const pending = loadPendingCheckout();
-    if (!pending) return;
-    const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
-    waitForEndUserAction(baseUrl, pending.pendingId).finally(() => {
-      clearPendingCheckout();
-    });
-  }, []);
-
-  // The widget's own tenant-level auth (apiKey or getToken bearer) - used
-  // for the end-user login flow's start_login/plans calls, which need to
-  // identify the *account*, not a visitor who may not have an identity yet.
-  // Kept separate from getAuthToken below so an active end-user session
-  // never shadows it.
-  const getTenantAuthToken = async (forceRefresh = false): Promise<{ token: string; type: 'apiKey' | 'bearer' }> => {
-    // console.log(`getAuthToken: force: ${forceRefresh}`)
-    if (config.apiKey) {
-      return { token: config.apiKey, type: 'apiKey' };
-    }
-    
-    if (!config.getToken) {
-      throw new Error('Either apiKey or getToken must be provided');
-    }
-    const getToken = config.getToken;
-
-    // Check token cache first (unless forcing refresh)
-    if (!forceRefresh) {
-      const now = Date.now() / 1000 + 5; // unix EPOCH seconds value + 5 seconds overlap
-      const cached = tokenCacheRef.current;
-      const isTokenValid = cached && (
-        cached.expiresAt == null || // No expiration - always valid
-        cached.expiresAt > now // Has expiration and not expired
-      );
-      
-      if (isTokenValid) {
-        return { token: cached.token, type: 'bearer' };
-      }
-    }
-
-    // Fetch new token - accepts either a raw string or a TokenResponse
-    const fetchToken = async (): Promise<TokenResponse> => {
-      const rawResult = await getToken(await getClientId());
-      return typeof rawResult === 'string'
-        ? { token: rawResult, expiresAt: undefined }
-        : rawResult;
-    };
-
-    let tokenResult: TokenResponse;
-    try {
-      tokenResult = await fetchToken();
-    } catch (err) {
-      // Only a client_id cvz-chat itself rejected is worth reacting to here -
-      // anything else (network error, bad API key, backend bug) wouldn't be
-      // fixed by a new client_id and just needs to propagate as before.
-      if (!isInvalidClientIdError(err)) {
-        throw err;
-      }
-      const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
-      clientIdPromiseRef.current = Promise.resolve(
-        await refreshClientIdAfterRejection(baseUrl, config.publicId, captchaMount),
-      );
-      tokenResult = await fetchToken(); // one retry with the (possibly still-null) client_id
-    }
-
-    tokenCacheRef.current = tokenResult;
-
-    return { token: tokenResult.token, type: 'bearer' };
-  };
-
-  // Effective auth for chat calls - an authenticated end-user identity
-  // (magic-link login) takes priority over this widget's own tenant-level
-  // apiKey/getToken, since it carries the visitor's own purchased balance.
-  const getAuthToken = async (forceRefresh = false): Promise<{ token: string; type: 'apiKey' | 'bearer' }> => {
-    if (!forceRefresh && isEndUserAuthValid(endUserAuth)) {
-      return { token: endUserAuth.token, type: 'bearer' };
-    }
-    return getTenantAuthToken(forceRefresh);
-  };
-
-  // Helper function to execute streaming with retry on auth errors
-  const executeStreaming = async (
-    userMessage: ChatMessage,
-    updatedMessages: ChatMessage[],
-    abortController: AbortController,
-    retryCount = 0
-  ): Promise<void> => {
-    const maxRetries = 1; // Only retry once for token refresh
-    // console.log("executeStreaming: started")
-    try {
-      // Get authentication token/key
-      const auth = await getAuthToken(retryCount > 0); // Force refresh on retry
-
-      const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL; // Defaults to 'https://chat.converzen.de'
-      
-      // Track sessionId locally to avoid React state closure issues
-      let currentSessionId = sessionId || '';
-      
-      // Determine which endpoint to use based on sessionId
-      const streamGenerator = streamChat({
-          baseUrl,
-          sessionId: currentSessionId,
-          message: userMessage.content,
-          persona: config.persona,
-          authToken: auth.token,
-          authType: auth.type,
-          clientId: (await getClientId()) ?? undefined,
-          extraContext: config.extraContext,
-          abortSignal: abortController.signal,
-        });
-
-      // console.log(`executeStreaming: started streaming with session: ${currentSessionId}`)
-
-        // Process stream events
-      let accumulatedContent = '';
-      let hasUnauthorizedError = false;
-      let hasFillerContent = false;
-      // Multiple SSE events parsed from the same network chunk are handled
-      // back-to-back with only a microtask gap between them - the browser
-      // never gets a paint in between, so e.g. a 'thinking' update can be
-      // fully overwritten by a 'tool_call_started' or 'token' that follows
-      // milliseconds later without ever being rendered. Track when the
-      // current filler text became visible and, before replacing it, wait
-      // out the rest of a minimum dwell time so the user actually sees it.
-      let fillerVisibleSince = 0;
-      const FILLER_MIN_DWELL_MS = 350;
-      const waitOutFillerDwell = async () => {
-        if (!fillerVisibleSince) return;
-        const remaining = FILLER_MIN_DWELL_MS - (Date.now() - fillerVisibleSince);
-        if (remaining > 0) {
-          await new Promise((resolve) => setTimeout(resolve, remaining));
-        }
-      };
-
-      for await (const event of streamGenerator) {
-        // Check if stream was aborted
-        if (abortController.signal.aborted) {
-            console.log("executeStreaming: abort signal received")
-            break;
-        }
-
-        // console.log(`executeStreaming: event received: ${JSON.stringify(event)}`);
-
-        switch (event.type) {
-          case 'session_created':
-          case 'session_continued':
-            if (event.session_id && (event.session_id !== currentSessionId)) {
-              currentSessionId = event.session_id;
-              setSessionId(event.session_id);
-              // console.log('Session ID:', event.session_id);
-            }
-            break;
-
-          case 'thinking':
-            if (event.content) {
-              if (!hasFillerContent) {
-                fillerVisibleSince = Date.now();
-              }
-              hasFillerContent = true;
-              thinkingBufferRef.current += event.content;
-              if (!thinkingRAFRef.current) {
-                thinkingRAFRef.current = requestAnimationFrame(() => {
-                  const newText = thinkingBufferRef.current;
-                  thinkingBufferRef.current = "";
-                  thinkingRAFRef.current = null;
-                  setThinkingMessage((prev) => prev + newText);
-                });
-              }
-            }
-            break;
-
-          case 'tool_call_started':
-            if (event.name) {
-              // A 'thinking' update may still be on screen (tool-call status
-              // takes rendering priority over it) - give it its dwell time
-              // before we replace it, or it'll never have been visible.
-              await waitOutFillerDwell();
-              hasFillerContent = true;
-              fillerVisibleSince = Date.now();
-              setActiveToolCall(event.name);
-            }
-            break;
-
-          case 'token':
-            if (event.content) {
-              if (hasFillerContent) {
-                await waitOutFillerDwell();
-                hasFillerContent = false;
-                fillerVisibleSince = 0;
-                thinkingBufferRef.current = '';
-                setThinkingMessage('');
-                setActiveToolCall(null);
-              }
-              streamBufferRef.current += event.content;
-              accumulatedContent += event.content;
-
-                if (!rAFRef.current) {
-                    rAFRef.current = requestAnimationFrame(() => {
-                        const newText = streamBufferRef.current;
-
-                        setStreamingMessage((prev) => {
-                            return prev + newText;
-                        });
-
-                        // 3. Reset the buffer and the rAF handle
-                        streamBufferRef.current = "";
-                        rAFRef.current = null;
-                    });
-                }
-            }
-            break;
-
-          case 'done':
-            // Finalize the assistant message
-            // console.log("received done event");
-            if (accumulatedContent && currentSessionId) {
-              // Set flag to prevent streaming message from rendering during finalization
-              isFinalizingRef.current = true;
-              
-              const assistantMessage: ChatMessage = {
-                content: accumulatedContent,
-                role: 'ASSISTANT',
-                createdAt: new Date().toISOString(),
-                sources: event.sources,
-              };
-              const finalMessages = [...updatedMessages, assistantMessage];
-              
-              // Update all states together - Preact will batch these updates
-              // Use functional updates to ensure we have the latest state
-              setMessages((prev) => finalMessages);
-              setStreamingMessage('');
-              thinkingBufferRef.current = '';
-              setThinkingMessage('');
-              setActiveToolCall(null);
-              setIsStreaming(false);
-              setIsLoading(false);
-
-              // Reset flag after state updates
-              setTimeout(() => {
-                isFinalizingRef.current = false;
-              }, 0);
-
-              await saveMessages(currentSessionId, finalMessages);
-            } else {
-              setStreamingMessage('');
-              thinkingBufferRef.current = '';
-              setThinkingMessage('');
-              setActiveToolCall(null);
-              setIsStreaming(false);
-              setIsLoading(false);
-            }
-            abortControllerRef.current = null;
-            return;
-
-          case 'error':
-            const errorCode = event.code || '';
-            const errorMsg = event.message || event.detail || '';
-            const wasUsingEndUserAuth = retryCount === 0 && isEndUserAuthValid(endUserAuth);
-
-            if ((errorCode === 'auth_failed' || errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('Unauthorized') || errorMsg.includes('Forbidden')) &&
-                retryCount < maxRetries &&
-                ((config.getToken && !config.apiKey) || wasUsingEndUserAuth)) {
-              console.warn('Auth error detected, refreshing token and retrying...');
-              tokenCacheRef.current = null;
-              if (wasUsingEndUserAuth) {
-                // The visitor's own token was rejected (expired/revoked
-                // server-side) - fall back to this widget's tenant auth on
-                // retry rather than looping on the same bad token, and drop
-                // the stale identity so the header reverts to "Authenticate".
-                deauthenticateEndUser();
-              }
-              hasUnauthorizedError = true;
-              break;
-            }
-
-            if (errorCode === 'rate_limited' && config.endUserLicensing) {
-              // A real nudge banner, not a chat bubble - the Authenticate
-              // control is what actually resolves this.
-              setShowAuthNudge(true);
-              setStreamingMessage('');
-              thinkingBufferRef.current = '';
-              setThinkingMessage('');
-              setActiveToolCall(null);
-              setIsStreaming(false);
-              setIsLoading(false);
-              abortControllerRef.current = null;
-              return;
-            }
-
-            console.error('Stream error:', errorCode, errorMsg);
-            const errorMessage: ChatMessage = {
-              content: errorMsg || 'An error occurred',
-              role: 'SYSTEM',
-              createdAt: new Date().toISOString(),
-            };
-            const errorMessages = [...updatedMessages, errorMessage];
-            setMessages(errorMessages);
-            // Pass sessionId to saveMessages (use current sessionId or empty string if null)
-            await saveMessages(currentSessionId || '', errorMessages);
-            setStreamingMessage('');
-            thinkingBufferRef.current = '';
-            setThinkingMessage('');
-            setActiveToolCall(null);
-            setIsStreaming(false);
-            setIsLoading(false);
-            abortControllerRef.current = null;
-            return;
-        }
-      }
-
-      // If we got an unauthorized error, retry once
-      if (hasUnauthorizedError && retryCount < maxRetries) {
-          // console.log("executeStreaming: retrying due to unauthorized error");
-          return executeStreaming(userMessage, updatedMessages, abortController, retryCount + 1);
-      }
-
-      // If we exit the loop without a 'done' event, something went wrong
-      if (!abortController.signal.aborted && !hasUnauthorizedError) {
-        console.error('Stream ended unexpectedly');
-        setStreamingMessage('');
-        thinkingBufferRef.current = '';
-        setThinkingMessage('');
-        setActiveToolCall(null);
-        setIsStreaming(false);
-        setIsLoading(false);
-        abortControllerRef.current = null;
-      }
-
-    } catch (error) {
-      // Check if it's an unauthorized error from fetch
-      const wasUsingEndUserAuth = retryCount === 0 && isEndUserAuthValid(endUserAuth);
-      if (error instanceof Error &&
-          (error.message.includes('401') || error.message.includes('403')) &&
-          retryCount < maxRetries &&
-          ((config.getToken && !config.apiKey) || wasUsingEndUserAuth)) {
-        // Clear token cache and retry once
-        console.warn('Unauthorized error detected, refreshing token and retrying...');
-        tokenCacheRef.current = null;
-        if (wasUsingEndUserAuth) {
-          deauthenticateEndUser();
-        }
-        return executeStreaming(userMessage, updatedMessages, abortController, retryCount + 1);
-      }
-
-      throw error; // Re-throw if not a retryable auth error
-    }
-  };
-
-
 
   const handleSendMessage = async (e?: Event) => {
     e?.preventDefault();
-    if (!inputValue.trim() || isStreaming) return;
-
-    // Cancel any existing stream
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    const userMessage: ChatMessage = {
-      content: inputValue.trim(),
-      role: 'USER',
-      createdAt: new Date().toISOString(),
-    };
-
-    // Use functional update to ensure we have the latest messages state
-    setMessages((prev) => [...prev, userMessage]);
-    // Compute updatedMessages for use in executeStreaming
-    const updatedMessages = [...messages, userMessage];
+    if (!inputValue.trim() || core.isStreaming) return;
+    const text = inputValue;
     setInputValue('');
-    setIsLoading(true);
-    setIsStreaming(true);
-    setStreamingMessage('');
-    thinkingBufferRef.current = '';
-    setThinkingMessage('');
-    setActiveToolCall(null);
-
-    try {
-      // Create new abort controller for this request
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
-
-      // Execute streaming with retry logic
-      await executeStreaming(userMessage, updatedMessages, abortController);
-
-    } catch (error) {
-      console.error('Error sending message:', error);
-      
-      // Handle abort errors gracefully
-      if (error instanceof Error && error.name === 'AbortError') {
-        setStreamingMessage('');
-        thinkingBufferRef.current = '';
-        setThinkingMessage('');
-        setActiveToolCall(null);
-        setIsStreaming(false);
-        setIsLoading(false);
-        abortControllerRef.current = null;
-        return;
-      }
-
-      // Show error to user
-      const errorMessage: ChatMessage = {
-        content: `Error: ${error instanceof Error ? error.message : 'Failed to send message'}`,
-        role: 'SYSTEM',
-        createdAt: new Date().toISOString(),
-      };
-      const errorMessages = [...updatedMessages, errorMessage];
-      setMessages(errorMessages);
-      // Pass sessionId to saveMessages (use current sessionId or empty string if null)
-      await saveMessages(sessionId || '', errorMessages);
-      setStreamingMessage('');
-      thinkingBufferRef.current = '';
-      setThinkingMessage('');
-      setActiveToolCall(null);
-      setIsStreaming(false);
-      setIsLoading(false);
-      abortControllerRef.current = null;
-    }
+    await core.sendMessage(text);
   };
 
   const handleClearHistory = async () => {
     if (window.confirm('Are you sure you want to clear your chat history?')) {
-      // Cancel any ongoing stream
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      
-      setMessages([{
-          content: config.initialGreeting || DEFAULT_INITIAL_GREETING,
-          role: 'SYSTEM',
-          createdAt: new Date().toISOString(),
-      }]);
-
-      setStreamingMessage('');
-      thinkingBufferRef.current = '';
-      setThinkingMessage('');
-      setActiveToolCall(null);
-      setSessionId(null);
-      setIsStreaming(false);
-      setIsLoading(false);
-      // Clear persisted session ID
-      // Pass sessionId to saveMessages (empty string since we're clearing)
-      await saveMessages('', []);
+      await core.clearHistory();
     }
   };
 
@@ -1060,35 +420,35 @@ const App = ({ config }: AppProps) => {
   const positionStyles = getPositionStyles(config.style);
   const dialogSizeStyles = getDialogSize(config.style);
   const frameColor = getFrameColor(config.style);
-  const buttonColors = getButtonColors(config.style, isOpen);
+  const buttonColors = getButtonColors(config.style, core.isOpen);
 
   // Determine dialog position relative to button based on main position
-  const isBottomPosition = !config.style?.position || 
+  const isBottomPosition = !config.style?.position ||
     (typeof config.style.position === 'string' && (config.style.position === 'bottom-right' || config.style.position === 'bottom-left')) ||
     (typeof config.style.position === 'object' && config.style.position.bottom);
-  
-  const isRightPosition = !config.style?.position || 
+
+  const isRightPosition = !config.style?.position ||
     (typeof config.style.position === 'string' && (config.style.position === 'bottom-right' || config.style.position === 'top-right')) ||
     (typeof config.style.position === 'object' && config.style.position.right);
 
   return (
-    <div 
+    <div
       className="cvz-fixed cvz-z-[9999] cvz-font-sans"
       style={positionStyles}
     >
       {/* Chat Window Container with Transition Logic */}
-      <div 
+      <div
         className={`
           cvz-absolute cvz-rounded-2xl cvz-shadow-2xl cvz-flex cvz-flex-col cvz-overflow-hidden
           cvz-transition-all cvz-duration-300
           ${config.darkMode ? 'cvz-bg-gray-800' : 'cvz-bg-white'}
           ${isBottomPosition ? 'cvz-bottom-20' : 'cvz-top-20'}
           ${isRightPosition ? 'cvz-right-0' : 'cvz-left-0'}
-          ${isBottomPosition && isRightPosition ? 'cvz-origin-bottom-right' : 
+          ${isBottomPosition && isRightPosition ? 'cvz-origin-bottom-right' :
             isBottomPosition && !isRightPosition ? 'cvz-origin-bottom-left' :
             !isBottomPosition && isRightPosition ? 'cvz-origin-top-right' : 'cvz-origin-top-left'}
-          ${isOpen 
-            ? 'cvz-opacity-100 cvz-scale-100 cvz-translate-y-0' 
+          ${core.isOpen
+            ? 'cvz-opacity-100 cvz-scale-100 cvz-translate-y-0'
             : 'cvz-opacity-0 cvz-scale-95 cvz-translate-y-4 cvz-pointer-events-none'}
         `}
         style={{
@@ -1101,7 +461,7 @@ const App = ({ config }: AppProps) => {
         <ChatHeader
           title={config.headerMsg || 'Support Chat'}
           subtitle={config.subheaderMsg || "We typically reply in a few minutes"}
-          onClose={() => setIsOpen(false)}
+          onClose={() => core.close()}
           onClear={handleClearHistory}
           darkMode={config.darkMode}
           icons={config.icons}
@@ -1114,39 +474,39 @@ const App = ({ config }: AppProps) => {
                     ? 'cvz-text-gray-200 hover:cvz-bg-gray-700/50'
                     : 'cvz-text-white hover:cvz-bg-blue-600/50'
                 }`}
-                title={endUserAuth ? `Signed in as ${endUserAuth.email}` : 'Authenticate'}
+                title={core.endUserAuth ? `Signed in as ${core.endUserAuth.email}` : 'Authenticate'}
               >
-                {endUserAuth ? 'Account' : 'Authenticate'}
+                {core.endUserAuth ? 'Account' : 'Authenticate'}
               </button>
             ) : undefined
           }
         />
 
-        {/* Turnstile's real mount point - see captchaMount. Collapsed to
+        {/* Turnstile's real mount point - see CaptchaMount. Collapsed to
             nothing unless a CAPTCHA challenge is actually resolving, so
             it's invisible for every account that doesn't gate client_id
             issuance at all. */}
         <div
-          ref={captchaContainerRef}
+          ref={(el: HTMLDivElement | null) => core.setCaptchaContainer(el)}
           className={`cvz-flex cvz-justify-center cvz-overflow-hidden cvz-transition-all cvz-duration-200 ${
-            captchaPending ? 'cvz-max-h-32 cvz-py-2' : 'cvz-max-h-0 cvz-py-0'
+            core.captchaPending ? 'cvz-max-h-32 cvz-py-2' : 'cvz-max-h-0 cvz-py-0'
           }`}
         />
 
         <ChatMessages
-          messages={messages}
-          isStreaming={isStreaming}
-          streamingMessage={streamingMessage}
-          thinkingMessage={thinkingMessage}
-          activeToolCall={activeToolCall}
-          isFinalizingRef={isFinalizingRef}
+          messages={core.messages}
+          isStreaming={core.isStreaming}
+          streamingMessage={core.streamingMessage}
+          thinkingMessage={core.thinkingMessage}
+          activeToolCall={core.activeToolCall}
+          isFinalizingRef={core.isFinalizingRef}
           messagesEndRef={messagesEndRef}
           enableMarkdown={config.enableMarkdown}
           darkMode={config.darkMode}
           icons={config.icons}
         />
 
-        {showAuthNudge && !isEndUserAuthValid(endUserAuth) && (
+        {core.showAuthNudge && !isEndUserAuthValid(core.endUserAuth) && (
           <div className={`cvz-px-4 cvz-py-2 cvz-text-xs cvz-flex cvz-items-center cvz-justify-between cvz-gap-2 ${
             config.darkMode ? 'cvz-bg-amber-900/40 cvz-text-amber-200' : 'cvz-bg-amber-50 cvz-text-amber-800'
           }`}>
@@ -1164,7 +524,7 @@ const App = ({ config }: AppProps) => {
           value={inputValue}
           onChange={setInputValue}
           onSubmit={handleSendMessage}
-          isLoading={isLoading || isStreaming}
+          isLoading={core.isLoading || core.isStreaming}
           placeholder={config.promptPlaceholder || "Type a message..."}
           darkMode={config.darkMode}
           icons={config.icons}
@@ -1176,9 +536,9 @@ const App = ({ config }: AppProps) => {
             onClose={() => setShowAuthModal(false)}
             darkMode={config.darkMode}
             baseUrl={config.chatUrl || DEFAULT_CHAT_API_URL}
-            getBaseAuth={() => getTenantAuthToken()}
-            endUserAuth={endUserAuth}
-            onAuthenticated={authenticateEndUser}
+            getBaseAuth={() => core.getTenantAuthToken()}
+            endUserAuth={core.endUserAuth}
+            onAuthenticated={core.authenticateEndUser}
             initialEmail={loadLastKnownEmail() ?? undefined}
           />
         )}
@@ -1186,36 +546,28 @@ const App = ({ config }: AppProps) => {
 
       {/* Toggle Button */}
       <button
-        onClick={() => {
-          const next = !isOpen;
-          setIsOpen(next);
-          // Only start resolving client_id once the panel is actually
-          // opening, not on mount - see the comment above loadHistory's
-          // effect. getClientId() memoizes, so reopening is a no-op once
-          // it's already resolved once.
-          if (next) void getClientId();
-        }}
+        onClick={() => (core.isOpen ? core.close() : core.open())}
         className={`
           cvz-flex cvz-items-center cvz-justify-center
           cvz-w-14 cvz-h-14 cvz-rounded-full cvz-shadow-lg cvz-transition-all cvz-duration-300
-          ${isOpen ? 'cvz-rotate-90' : 'cvz-hover:cvz-scale-105'}
+          ${core.isOpen ? 'cvz-rotate-90' : 'cvz-hover:cvz-scale-105'}
         `}
         style={{
           backgroundColor: buttonColors.backgroundColor,
         }}
         onMouseEnter={(e) => {
-          if (!isOpen && config.style?.buttonColor?.hover) {
+          if (!core.isOpen && config.style?.buttonColor?.hover) {
             e.currentTarget.style.backgroundColor = config.style.buttonColor.hover;
           }
         }}
         onMouseLeave={(e) => {
-          if (!isOpen) {
+          if (!core.isOpen) {
             e.currentTarget.style.backgroundColor = buttonColors.backgroundColor as string;
           }
         }}
       >
         <div className="cvz-text-white">
-          {isOpen
+          {core.isOpen
             ? <IconSlot custom={config.icons?.close} fallback={<XMarkIcon />} className="cvz-w-6 cvz-h-6" />
             : <IconSlot custom={config.icons?.launcher} fallback={<ChatIcon />} className="cvz-w-6 cvz-h-6" />}
         </div>

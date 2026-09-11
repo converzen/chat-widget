@@ -418,6 +418,51 @@ interface TokenResponse {
 }
 ```
 
+## Custom Presentation
+
+The default export (`.`) is a complete, ready-to-drop-in widget: Preact UI, Shadow DOM isolation, the works. If you want your own look and feel instead - your own brand colors/gradients, your own message bubble shapes, your own layout - without re-implementing SSE streaming, auth-token refresh, session continuation, or client-id/CAPTCHA handling yourself, build on top of `@converzen/chat-widget/core` (and `/react` if you're in a React-based app) instead.
+
+- **`@converzen/chat-widget/core`** exports `createChatCore(config)`, a framework-agnostic store (`getState()`/`subscribe()`/action methods, the same shape as a Zustand vanilla store) holding all the non-UI logic. Zero UI-framework dependency - useful for building an adapter for a framework this package doesn't ship one for.
+- **`@converzen/chat-widget/react`** exports `useChatCore(config)`, a real React hook built on React's own `useSyncExternalStore` (React 18+). Works natively in Next.js and any other React-based framework - no Preact anywhere in your dependency tree.
+
+```tsx
+'use client'; // must run client-side - it touches localStorage/fetch streaming/DOM
+
+import { useMemo, useState } from 'react';
+import { useChatCore, type WidgetConfig } from '@converzen/chat-widget/react';
+
+export function MyChatPanel() {
+  // IMPORTANT: config must be a stable reference across renders (useMemo,
+  // or define it outside the component) - a new object literal every render
+  // creates a brand-new store every render, discarding all chat state.
+  const config = useMemo<WidgetConfig>(() => ({
+    getToken: async (clientId) => {
+      const res = await fetch('/api/chat/get_token', {
+        method: 'POST',
+        body: JSON.stringify({ clientId }),
+      });
+      return res.json();
+    },
+  }), []);
+
+  const chat = useChatCore(config);
+  const [input, setInput] = useState('');
+
+  return (
+    <div>
+      {chat.messages.map((m) => (
+        <p key={m.createdAt}>{m.role}: {m.content}</p>
+      ))}
+      {chat.isStreaming && <p>{chat.streamingMessage}</p>}
+      <input value={input} onChange={(e) => setInput(e.target.value)} />
+      <button onClick={() => { chat.sendMessage(input); setInput(''); }}>Send</button>
+    </div>
+  );
+}
+```
+
+`useChatCore`/`createChatCore` return the same shape: chat state (`messages`, `isOpen`, `isStreaming`, `streamingMessage`, `thinkingMessage`, `activeToolCall`, `sessionId`, ...) plus actions (`sendMessage`, `open`, `close`, `clearHistory`, ...). `getPositionStyles`/`getDialogSize`/`getFrameColor`/`getButtonColors` (also exported from both entries) are available if you want to honor a `WidgetStyle` config the same way the default presentation does, but you're free to ignore them and build your own styling entirely.
+
 ## Examples
 
 ### Example 1: Simple Integration with API Key
@@ -484,6 +529,8 @@ This will watch for changes and rebuild automatically.
 ### Testing
 
 Open `test.html` in your browser after building to test the widget locally. Update its `chatUrl` and `apiKey` to point at whichever cvz-chat environment you're testing against (`chat.converzen.de` for prod, `chat.converzent.de` for test) - it does not infer this from anything, so a stale value will silently exercise the wrong backend.
+
+`npm run smoke` runs a small Node-based check of `@converzen/chat-widget/core`'s own state-machine wiring (no browser, no real cvz-chat backend needed) - it's not a substitute for exercising `test.html`, just a fast regression check for `createChatCore` itself.
 
 ## Production Deployment
 
