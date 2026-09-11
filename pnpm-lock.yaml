@@ -26,6 +26,9 @@ importers:
       preact:
         specifier: ^10.19.0
         version: 10.29.8
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
       react-markdown:
         specifier: ^9.0.0
         version: 9.1.0(@types/react@18.3.31)(react@18.3.1)

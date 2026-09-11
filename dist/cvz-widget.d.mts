@@ -9,7 +9,6 @@ interface ChatPersonaIdentifier {
     persona_id?: number;
     version_tag?: string;
 }
-
 interface TokenResponse {
     token: string;
     expiresAt?: number;
@@ -62,6 +61,7 @@ interface WidgetConfig {
     extraContext?: Record<string, unknown>;
     autoOpen?: boolean;
 }
+
 declare class WidgetManager {
     private hostElement;
     readonly buildId: string;
