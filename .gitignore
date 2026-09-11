@@ -9,7 +9,6 @@
 # Rebuild with `npm run build` before committing a change to src/.
 /.claude
 /.worktrees
-/dist
 /.idea/
 /src/old/
 # dependencies
