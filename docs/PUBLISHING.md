@@ -2,18 +2,16 @@
 
 This guide explains how to publish the ConverZen Chat Widget to npm, GitHub, and CDN.
 
-> **Status:** not published yet, but `package.json`/`tsup.config.ts` are now publish-ready:
-> `main`/`module`/`browser`/`exports` each resolve to a real build (IIFE for the CDN/script-tag
-> use case, ESM, and a genuine CJS build - `require('@converzen/chat-widget')` used to silently
+> **Status:** published. `@converzen/chat-widget` is live on the npm registry as of `1.2.0`
+> (`npm view @converzen/chat-widget` - published by the `converzen` npm account). `main`/
+> `module`/`browser`/`exports` each resolve to a real build (IIFE for the CDN/script-tag use
+> case, ESM, and a genuine CJS build - `require('@converzen/chat-widget')` used to silently
 > return `{}` because `main`/the `require` condition pointed at the side-effecting IIFE file,
-> which has no exports; there's now a dedicated `dist/cvz-widget.cjs` for that), a `LICENSE`
-> file exists and is included via `files`, and `npm pack --dry-run` produces a clean tarball
-> (`dist/`, `README.md`, `LICENSE`, no `src/`). `@converzen/chat-widget` is still not on the npm
-> registry (`npm view @converzen/chat-widget` 404s) and there are no GitHub releases - actually
-> running `npm publish` is a deliberate, one-way action for a human to trigger, not something
-> done as part of a docs/prep pass. The widget currently reaches production only via
-> `cvz-infra/deploy/deploy.sh --prod`, serving `dist/` from `https://converzen.de/widget/latest/`.
-> This guide is the plan for *when* npm publishing happens.
+> which has no exports; there's now a dedicated `dist/cvz-widget.cjs` for that), and a `LICENSE`
+> file is included. There are no GitHub releases yet (see §2 below). Production still reaches
+> `converzen.de` via `cvz-infra/deploy/deploy.sh --prod`, serving `dist/` from
+> `https://converzen.de/widget/latest/` - npm/unpkg/jsDelivr are an additional distribution
+> channel for third-party integrators, not a replacement for that deploy path.
 
 ## Prerequisites
 
@@ -184,8 +182,8 @@ Follow [semver](https://semver.org/):
 - [x] Verify all configuration options are documented
 - [x] Check that `.npmignore` excludes unnecessary files
 - [x] Ensure `dist/` contains all necessary files (verify with `npm pack --dry-run`)
-- [ ] `npm login` as an account with publish rights on the `@converzen` org
-- [ ] `npm publish --access public` (a human, deliberately - see Status above)
+- [x] `npm login` (or `pnpm login`) as an account with publish rights on the `@converzen` org
+- [x] `npm publish --access public` (or `pnpm publish --access public`) - a human, deliberately
 
 ## Post-Publishing
 
@@ -203,6 +201,16 @@ Follow [semver](https://semver.org/):
 ### npm: "You do not have permission"
 - Ensure you're logged in: `npm whoami`
 - For scoped packages, use `--access public`
+
+### npm/pnpm: `403 Forbidden ... Two-factor authentication or granular access token with bypass 2fa enabled is required`
+This is registry-level 2FA enforcement, independent of npm vs pnpm - both hit the same rule.
+Two ways around it:
+- Enable 2FA on the publishing npm account (npmjs.com → Account Settings → Two-Factor
+  Authentication), set it to require OTP for **writes** (not just login), then pass the code
+  from your authenticator app: `pnpm publish --access public --otp=123456`.
+- Or generate a **Granular Access Token** (npmjs.com → Account Settings → Access Tokens) scoped
+  to `@converzen`, permission Read and write, with **"Bypass two-factor authentication"**
+  checked - useful for publishing from CI without an interactive OTP prompt.
 
 ### CDN: CORS errors
 - Enable CORS headers on your CDN

@@ -70,16 +70,14 @@ Need Markdown rendering in messages? Just set `enableMarkdown: true` — see [Ma
 
 ### Option 2: NPM Package
 
-> **Not yet published.** `@converzen/chat-widget` is not currently on the npm registry. Until it is, use the CDN option above or build from source (Option 3). This section describes the intended usage once it's published.
-
 ```bash
 npm install @converzen/chat-widget
 ```
 
 ```javascript
-import { init } from '@converzen/chat-widget';
+import cvzWidget from '@converzen/chat-widget';
 
-init({
+cvzWidget.init({
   apiKey: "your-api-key-here",
   // ... configuration
 });
