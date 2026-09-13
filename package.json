@@ -1,8 +1,8 @@
 {
   "name": "@converzen/chat-widget",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Drop-in chat widget SDK for ConverZen - Easy to integrate, customizable, and fully featured chat widget",
-  "main": "./dist/cvz-widget.js",
+  "main": "./dist/cvz-widget.cjs",
   "module": "./dist/cvz-widget.mjs",
   "browser": "./dist/cvz-widget.js",
   "exports": {
@@ -13,7 +13,7 @@
       },
       "require": {
         "types": "./dist/cvz-widget.d.ts",
-        "default": "./dist/cvz-widget.js"
+        "default": "./dist/cvz-widget.cjs"
       },
       "default": "./dist/cvz-widget.js"
     },
@@ -41,7 +41,8 @@
   "types": "./dist/cvz-widget.d.ts",
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "dev": "npm run build && (tailwindcss -i ./src/styles/global.css -o ./src/styles/output.css --watch & tsup --watch)",

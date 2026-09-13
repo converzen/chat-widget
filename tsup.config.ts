@@ -28,10 +28,16 @@ export default defineConfig([
     // real module build for npm-style consumers (e.g. `import cvzWidget
     // from '@converzen/chat-widget'`) - it still self-registers the global
     // too (harmless, same as the IIFE), it's just also a proper module.
-    format: ['iife', 'esm'],
+    // 'cjs' exists solely so `require('@converzen/chat-widget')` (Jest,
+    // older bundlers, anything not using the "exports" map's import
+    // condition) resolves to a real module with a `default` export instead
+    // of silently getting `{}` back from the side-effecting IIFE build.
+    format: ['iife', 'esm', 'cjs'],
     // globalName removed to allow manual assignment in index.ts
     outDir: 'dist',
-    outExtension: ({ format }) => ({ js: format === 'esm' ? '.mjs' : '.js' }),
+    outExtension: ({ format }) => ({
+      js: format === 'esm' ? '.mjs' : format === 'cjs' ? '.cjs' : '.js',
+    }),
     clean: false, // Don't clean on second build
     minify: true,
     treeshake: true,

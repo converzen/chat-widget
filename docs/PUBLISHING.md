@@ -2,11 +2,18 @@
 
 This guide explains how to publish the ConverZen Chat Widget to npm, GitHub, and CDN.
 
-> **Status:** none of this has happened yet. `@converzen/chat-widget` is not on the npm
-> registry (`npm view @converzen/chat-widget` 404s), and there are no GitHub releases. The
-> widget currently reaches production only via `cvz-infra/deploy/deploy.sh --prod`, serving
-> `dist/` from `https://converzen.de/widget/latest/`. This guide is the plan for *if/when* npm
-> publishing happens, not a description of the current process.
+> **Status:** not published yet, but `package.json`/`tsup.config.ts` are now publish-ready:
+> `main`/`module`/`browser`/`exports` each resolve to a real build (IIFE for the CDN/script-tag
+> use case, ESM, and a genuine CJS build - `require('@converzen/chat-widget')` used to silently
+> return `{}` because `main`/the `require` condition pointed at the side-effecting IIFE file,
+> which has no exports; there's now a dedicated `dist/cvz-widget.cjs` for that), a `LICENSE`
+> file exists and is included via `files`, and `npm pack --dry-run` produces a clean tarball
+> (`dist/`, `README.md`, `LICENSE`, no `src/`). `@converzen/chat-widget` is still not on the npm
+> registry (`npm view @converzen/chat-widget` 404s) and there are no GitHub releases - actually
+> running `npm publish` is a deliberate, one-way action for a human to trigger, not something
+> done as part of a docs/prep pass. The widget currently reaches production only via
+> `cvz-infra/deploy/deploy.sh --prod`, serving `dist/` from `https://converzen.de/widget/latest/`.
+> This guide is the plan for *when* npm publishing happens.
 
 ## Prerequisites
 
@@ -170,13 +177,15 @@ Follow [semver](https://semver.org/):
 
 ## Checklist Before Publishing
 
-- [ ] Update version in `package.json`
-- [ ] Update `README.md` with latest features
-- [ ] Run `npm run build` successfully
+- [x] Update version in `package.json`
+- [x] Update `README.md` with latest features
+- [x] Run `npm run build` successfully
 - [ ] Test the built file locally (`test.html`)
-- [ ] Verify all configuration options are documented
-- [ ] Check that `.npmignore` excludes unnecessary files
-- [ ] Ensure `dist/` contains all necessary files
+- [x] Verify all configuration options are documented
+- [x] Check that `.npmignore` excludes unnecessary files
+- [x] Ensure `dist/` contains all necessary files (verify with `npm pack --dry-run`)
+- [ ] `npm login` as an account with publish rights on the `@converzen` org
+- [ ] `npm publish --access public` (a human, deliberately - see Status above)
 
 ## Post-Publishing
 

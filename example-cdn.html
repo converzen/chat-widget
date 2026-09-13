@@ -45,27 +45,26 @@
         }
       },
 
-      // Message persistence callbacks - both required
-      onSaveMessages: async (sessionId, messages) => {
-        // Save the session id and messages to your backend
-        console.log('Saving:', sessionId, messages);
-        // Example:
-        // await fetch('/api/messages', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ sessionId, messages })
-        // });
-      },
+      // Conversation history persists to localStorage automatically -
+      // nothing to do here. Set persistMessages: false for session-only
+      // history instead, or supply your own onSaveMessages/onLoadMessages
+      // below for a real backend (cross-device sync, analytics, etc.) -
+      // either one takes priority over the localStorage default when set.
+      // persistMessages: true,
 
-      onLoadMessages: async () => {
-        // Restore a previous conversation, or return an empty history
-        // to start fresh - the widget shows initialGreeting in that case
-        console.log('Loading messages...');
-        // Example:
-        // const response = await fetch('/api/messages');
-        // return response.json(); // { sessionId, messages }
-        return { sessionId: '', messages: [] };
-      }
+      // onSaveMessages: async (sessionId, messages) => {
+      //   await fetch('/api/messages', {
+      //     method: 'POST',
+      //     headers: { 'Content-Type': 'application/json' },
+      //     body: JSON.stringify({ sessionId, messages })
+      //   });
+      // },
+      //
+      // onLoadMessages: async () => {
+      //   const response = await fetch('/api/messages');
+      //   if (!response.ok) return { sessionId: '', messages: [] };
+      //   return response.json(); // { sessionId, messages }
+      // }
     });
   </script>
 </body>
