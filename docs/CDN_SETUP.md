@@ -2,12 +2,15 @@
 
 This guide explains how to set up the ConverZen Chat Widget for CDN distribution.
 
-> **Status:** this describes a general-purpose CDN workflow, not what's actually running today.
-> In production the widget is deployed by `cvz-infra/deploy/deploy.sh --prod`, which copies
-> `dist/` straight to `/var/opt/services/converzen/public/widget/latest/` on the server; nginx
-> (`cvz-infra/nginx/converzen.de`) serves that at `https://converzen.de/widget/latest/`. There
-> is no `cdn.converzen.de` host and the package is not published to npm/unpkg/jsDelivr - treat
-> the CDN URLs below as illustrative until one of these paths is actually set up.
+> **Status:** production deploys still work the way they always have - `cvz-infra/deploy/deploy.sh
+> --prod` copies `dist/` straight to `/var/opt/services/converzen/public/widget/latest/` on the
+> server; nginx (`cvz-infra/nginx/converzen.de`) serves that at `https://converzen.de/widget/latest/`.
+> That's unchanged and remains the URL documented in the main [README](../README.md#installation).
+>
+> What *has* changed: `@converzen/chat-widget` is now published to npm (see `docs/PUBLISHING.md`),
+> which means Option 3 below (unpkg/jsDelivr) is real and live today - no extra setup needed,
+> npm publication is all either CDN requires. There is still no `cdn.converzen.de` host (Option 1)
+> and no GitHub releases yet (Option 2) - those two remain illustrative.
 
 ## Building for CDN
 
@@ -39,9 +42,9 @@ This creates `dist/cvz-widget.js` which can be hosted on any CDN or static file 
    <script src="https://cdn.jsdelivr.net/gh/converzen/chat-widget@latest/dist/cvz-widget.js"></script>
    ```
 
-### Option 3: npm CDN (unpkg/jsDelivr)
+### Option 3: npm CDN (unpkg/jsDelivr) - live today
 
-If published to npm, users can use:
+`@converzen/chat-widget` is published, so both of these resolve right now:
 
 ```html
 <!-- unpkg -->
@@ -49,6 +52,13 @@ If published to npm, users can use:
 
 <!-- jsDelivr -->
 <script src="https://cdn.jsdelivr.net/npm/@converzen/chat-widget@latest/dist/cvz-widget.js"></script>
+```
+
+Pin a version instead of `@latest` for production stability, same reasoning as the main
+[README](../README.md#installation)'s advice for the `converzen.de` URL:
+
+```html
+<script src="https://unpkg.com/@converzen/chat-widget@1.2.0/dist/cvz-widget.js"></script>
 ```
 
 ## Versioning
