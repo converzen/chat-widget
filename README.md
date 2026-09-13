@@ -173,6 +173,8 @@ Use exactly one of `apiKey` or `getToken` - never both:
 
 The widget generates a stable per-browser id (stored in `localStorage`) and passes it as the sole argument to your `getToken` callback: `getToken(clientId)`. Existing zero-argument `getToken` implementations keep working unchanged - the argument is simply ignored if you don't declare it.
 
+`clientId` is `string | null` - it's `null` when no id is available yet (e.g. `publicId` isn't configured, or cvz-chat couldn't be reached to issue one). Forward it through as-is rather than substituting your own value; cvz-chat treats a missing `client_id` as "not yet provided", not as an error, until enforcement is turned on for your account.
+
 In `apiKey` mode this id is sent automatically on every request as an `X-Client-Id` header, so there's nothing for you to wire up. In `getToken`/JWT mode, forward it to cvz-chat's `POST /api/get_token` as `client_id` so the minted JWT carries it as a claim and per-visitor rate limiting can identify the visitor; the widget also sends it as a fallback `X-Client-Id` header in this mode in case your backend doesn't forward it into the token. This id is a cost-control signal, not a security boundary - clearing storage or an incognito window resets it.
 
 `getToken` may return either:
@@ -192,7 +194,14 @@ On a 401/403 from the chat API, the widget clears its cached token, calls `getTo
 
 If your `getToken` throws/rejects with cvz-chat's own `get_token` error text (`invalid client_id` or `client_id does not belong to this account` - see the example above, which forwards it as-is), the widget treats that as its client_id being stale rather than a generic failure: it discards the cached one, requests a fresh one from cvz-chat, and retries `getToken` once more with it. This is throttled to once an hour per browser for accounts with no CAPTCHA on client_id issuance, so a durably-invalid id (e.g. after a server-side key rotation) can't turn into a request on every message; accounts that do require a CAPTCHA aren't throttled this way, since solving one is itself the cost gate. If your backend doesn't propagate that exact error text, this recovery step simply never triggers - no different from before it existed.
 
-If `WidgetConfig.publicId` is set (the non-secret id from your ConverZen dashboard), `clientId` is instead one cvz-chat itself issued and vouches for - see the "Client ID Protocol" design - rather than a self-generated value. Resolution starts when the visitor opens the widget (not on page load, so a CAPTCHA-gated account never runs a challenge before the visitor has done anything) and is memoized, so reopening doesn't repeat it. If your account requires a CAPTCHA, a small Cloudflare Turnstile or reCAPTCHA widget briefly appears above the message list while it resolves - deliberately real and visible rather than hidden, since a hidden or off-screen challenge measurably hurts its own solve rate. Without `publicId`, `clientId` falls back to the old self-generated, unverified value - no regression for integrations that haven't adopted it.
+If `WidgetConfig.publicId` is set (the non-secret id from your ConverZen dashboard, next to your API key), `clientId` is instead one cvz-chat itself issued and vouches for - see the "Client ID Protocol" design - rather than a self-generated value. Resolution starts when the visitor opens the widget (not on page load, so a CAPTCHA-gated account never runs a challenge before the visitor has done anything) and is memoized, so reopening doesn't repeat it. If your account requires a CAPTCHA, a small Cloudflare Turnstile or reCAPTCHA widget briefly appears above the message list while it resolves - deliberately real and visible rather than hidden, since a hidden or off-screen challenge measurably hurts its own solve rate. Without `publicId`, `clientId` falls back to the old self-generated, unverified value - no regression for integrations that haven't adopted it.
+
+```javascript
+cvzWidget.init({
+  // ...
+  publicId: "pub_...", // from the ConverZen dashboard, next to your API key
+});
+```
 
 #### Message persistence
 
@@ -275,6 +284,19 @@ persona: {
 
 Why: a session is permanently bound to whichever persona/version created it, so continuation requests (`/api/chat/continuation/stream`) don't take a persona at all - there's nothing to reselect. In `getToken` mode, persona selection happens on your backend when it requests the JWT (pass `persona` to cvz-chat's `POST /api/get_token`); the token itself encodes which persona/version it's scoped to, so the widget has nothing to add. If you need per-conversation persona switching in JWT mode, control it by requesting a differently-scoped token, not via this config field.
 
+### End-user licensing (magic-link auth & credits)
+
+`endUserLicensing: true` enables ConverZen's own end-user subscription/credits monetization: a persistent "Authenticate" control appears in the widget header that lets a visitor log in via an emailed magic link, see their vToken balance and renewal date, and buy a plan - all independent of the widget's own tenant-level `apiKey`/`getToken` auth.
+
+```javascript
+cvzWidget.init({
+  // ...
+  endUserLicensing: true, // only for accounts with end-user billing plans set up in the dashboard
+});
+```
+
+Default `false` - no UI, no behavior change. Only turn this on for accounts that have configured end-user billing plans in the ConverZen dashboard; the identity and purchase flow (email, magic-link verification, checkout) is handled entirely by the widget's built-in UI, with its own `localStorage`-persisted session - there's nothing else to wire up on your end.
+
 ### Styling Customization
 
 Customize the widget appearance:
@@ -334,7 +356,8 @@ Restyles the header, message bubbles, input, and Markdown content for a dark bac
 |--------|------|----------|---------|-------------|
 | `chatUrl` | `string` | No | `"https://chat.converzen.de"` | cvz-chat API base URL |
 | `apiKey` | `string` | No* | - | Direct API key (insecure/demo mode) |
-| `getToken` | `(clientId: string) => Promise<string \| TokenResponse>` | No* | - | Returns a JWT to use in secure mode - see [Per-visitor rate limiting](#per-visitor-rate-limiting-clientid) |
+| `getToken` | `(clientId: string \| null) => Promise<string \| TokenResponse>` | No* | - | Returns a JWT to use in secure mode - see [Per-visitor rate limiting](#per-visitor-rate-limiting-clientid) |
+| `publicId` | `string` | No | - | Non-secret id from your dashboard that gets you a cvz-chat-issued `clientId` - see [Per-visitor rate limiting](#per-visitor-rate-limiting-clientid) |
 | `persistMessages` | `boolean` | No | `true` | Persist conversation history to localStorage - see [Message persistence](#message-persistence) |
 | `headerMsg` | `string` | No | `"Support Chat"` | Header title |
 | `subheaderMsg` | `string` | No | `"We typically reply in a few minutes"` | Header subtitle |
@@ -349,6 +372,7 @@ Restyles the header, message bubbles, input, and Markdown content for a dark bac
 | `onLoadMessages` | `() => Promise<{sessionId: string, messages: ChatMessage[]}>` | No | - | Your own history backend - see [Message persistence](#message-persistence) |
 | `extraContext` | `Record<string, unknown>` | No | - | Extra fields merged into every completion/continuation request - see [Extra context per message](#extra-context-per-message) |
 | `autoOpen` | `boolean` | No | `false` | Start the panel open on mount - see [Opening the panel programmatically](#opening-the-panel-programmatically) |
+| `endUserLicensing` | `boolean` | No | `false` | Enable end-user magic-link auth and credits/subscription purchase - see [End-user licensing](#end-user-licensing-magic-link-auth--credits) |
 
 *Either `apiKey` or `getToken` must be provided.
 
@@ -531,6 +555,10 @@ This will watch for changes and rebuild automatically.
 Open `test.html` in your browser after building to test the widget locally. Update its `chatUrl` and `apiKey` to point at whichever cvz-chat environment you're testing against (`chat.converzen.de` for prod, `chat.converzent.de` for test) - it does not infer this from anything, so a stale value will silently exercise the wrong backend.
 
 `npm run smoke` runs a small Node-based check of `@converzen/chat-widget/core`'s own state-machine wiring (no browser, no real cvz-chat backend needed) - it's not a substitute for exercising `test.html`, just a fast regression check for `createChatCore` itself.
+
+### Build tag
+
+Every build of the default entry embeds a short debugging tag - the commit it was built from plus the build timestamp (`<short-sha>-<ISO timestamp>`, or `unknown-...` if `.git` wasn't available in the build context, e.g. some Docker setups). It's logged once by `init()` and readable any time at `window.cvzWidget.buildId` - purely a "what am I actually looking at" aid when diagnosing which deploy a page is running, not user-facing.
 
 ## Production Deployment
 
