@@ -17,7 +17,7 @@
  * dependency array.
  */
 
-import { useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { createChatCore, type ChatCoreState, type ChatCoreStore } from '../core/chatCore';
 import type { WidgetConfig } from '../types';
 
@@ -41,6 +41,10 @@ export function useChatCore(config: WidgetConfig): UseChatCoreResult {
   const store = useMemo(() => createChatCore(config), [config]);
   const state = useSyncExternalStore(store.subscribe, store.getState, () => SERVER_SNAPSHOT);
 
+  // Stop a still-streaming reply when this store is dropped (unmount, or a
+  // new config).
+  useEffect(() => () => store.dispose(), [store]);
+
   return {
     ...state,
     sendMessage: store.sendMessage,
@@ -52,5 +56,6 @@ export function useChatCore(config: WidgetConfig): UseChatCoreResult {
     getTenantAuthToken: store.getTenantAuthToken,
     setCaptchaContainer: store.setCaptchaContainer,
     isFinalizingRef: store.isFinalizingRef,
+    dispose: store.dispose,
   };
 }

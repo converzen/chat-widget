@@ -36,7 +36,7 @@ declare const __CVZ_BUILD_ID__: string;
  * - it renders as a normal component in its own tree instead (no Shadow DOM
  * isolation needed on a page you already control the CSS of).
  */
-function mountApp(config: WidgetConfig, AppComponent: typeof App): HTMLDivElement {
+function mountApp(config: WidgetConfig, AppComponent: typeof App): { hostElement: HTMLDivElement; root: HTMLDivElement } {
     const hostElement = document.createElement('div');
     hostElement.id = HOST_ELEMENT_ID;
     document.body.appendChild(hostElement);
@@ -52,11 +52,12 @@ function mountApp(config: WidgetConfig, AppComponent: typeof App): HTMLDivElemen
     shadowRoot.appendChild(preactRootElement);
 
     render(createElement(AppComponent, {config}), preactRootElement);
-    return hostElement;
+    return { hostElement, root: preactRootElement };
 }
 
 class WidgetManager {
     private hostElement: HTMLDivElement | null = null;
+    private root: HTMLDivElement | null = null;
     readonly buildId: string = __CVZ_BUILD_ID__;
 
     init(config: WidgetConfig) {
@@ -68,7 +69,7 @@ class WidgetManager {
         console.log('init: Initializing cvzWidget...', this.buildId);
         console.log('CSS Length:', styles.length); // Debug log
 
-        this.hostElement = mountApp(config, App);
+        ({ hostElement: this.hostElement, root: this.root } = mountApp(config, App));
     }
 
     // ... methods ...
@@ -79,6 +80,13 @@ class WidgetManager {
             return;
         }
 
+        // Unmount first, so effects clean up (aborting a still-streaming
+        // reply) before the host goes - a hide() followed by init() with a
+        // different config (e.g. another persona) then starts truly fresh.
+        if (this.root) {
+            render(null, this.root);
+            this.root = null;
+        }
         if (this.hostElement) {
             this.hostElement.remove();
             this.hostElement = null;

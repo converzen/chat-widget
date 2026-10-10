@@ -203,7 +203,24 @@ cvzWidget.init({
 
 #### Message persistence
 
-Conversation history persists to `localStorage` automatically - one shared key per origin, lightly obfuscated (Base64, not encryption - there's no key to speak of, since it would ship in this same public JS bundle either way; this stops a casual glance at localStorage in devtools, nothing that resists real intent). Set `persistMessages: false` for session-only history instead - nothing written, nothing restored, a fresh conversation on every reload.
+Conversation history persists to `localStorage` automatically - under the key `cvz_chat_history` by default, lightly obfuscated (Base64, not encryption - there's no key to speak of, since it would ship in this same public JS bundle either way; this stops a casual glance at localStorage in devtools, nothing that resists real intent). Set `persistMessages: false` for session-only history instead - nothing written, nothing restored, a fresh conversation on every reload.
+
+If one page switches between several personas, give each its own `historyKey`. Otherwise they share one conversation, and worse, one `sessionId`: cvz-chat continues a session with the persona that created it, so a restored session would keep answering as the old persona after the switch.
+
+```javascript
+function switchPersona(persona) {
+  window.cvzWidget.hide(); // unmounts and aborts a still-streaming reply
+  window.cvzWidget.init({
+    ...baseConfig,
+    historyKey: `cvz_chat_history:${persona.id}`, // own history + session per persona
+    headerMsg: persona.headerMsg,
+    initialGreeting: persona.greeting,
+    autoOpen: true,
+  });
+}
+```
+
+Each persona's conversation stays put while you switch away and is restored when you switch back; "clear" only wipes the current key. The visitor's client_id and end-user login stay shared across all of them, since they identify the visitor, not the conversation.
 
 For your own backend, cross-device sync, or analytics, supply `onSaveMessages`/`onLoadMessages` instead - either one takes priority over the built-in `persistMessages` behavior when supplied:
 
@@ -367,6 +384,7 @@ Restyles the header, message bubbles, input, and Markdown content for a dark bac
 | `style` | `WidgetStyle` | No | - | Styling customization |
 | `icons` | `WidgetIcons` | No | - | Icon overrides |
 | `onSaveMessages` | `(sessionId: string, messages: ChatMessage[]) => Promise<void>` | No | - | Your own history backend - see [Message persistence](#message-persistence) |
+| `historyKey` | `string` | No | `'cvz_chat_history'` | localStorage key for the built-in persistence - one per persona when switching, see [Message persistence](#message-persistence) |
 | `onLoadMessages` | `() => Promise<{sessionId: string, messages: ChatMessage[]}>` | No | - | Your own history backend - see [Message persistence](#message-persistence) |
 | `extraContext` | `Record<string, unknown>` | No | - | Extra fields merged into every completion/continuation request - see [Extra context per message](#extra-context-per-message) |
 | `autoOpen` | `boolean` | No | `false` | Start the panel open on mount - see [Opening the panel programmatically](#opening-the-panel-programmatically) |

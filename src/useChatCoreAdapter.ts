@@ -7,7 +7,7 @@
  * of react. Not part of the public package surface.
  */
 
-import { useMemo, useSyncExternalStore } from 'preact/compat';
+import { useEffect, useMemo, useSyncExternalStore } from 'preact/compat';
 import { createChatCore, type ChatCoreState, type ChatCoreStore } from './core/chatCore';
 import type { WidgetConfig } from './types';
 
@@ -21,6 +21,10 @@ export function useChatCoreAdapter(config: WidgetConfig): ChatCoreAdapterResult 
   // client-side via WidgetManager.init() in the first place.
   const state = useSyncExternalStore(store.subscribe, store.getState);
 
+  // Stop a still-streaming reply when this store is dropped (unmount, or a
+  // new config).
+  useEffect(() => () => store.dispose(), [store]);
+
   return {
     ...state,
     sendMessage: store.sendMessage,
@@ -32,5 +36,6 @@ export function useChatCoreAdapter(config: WidgetConfig): ChatCoreAdapterResult 
     getTenantAuthToken: store.getTenantAuthToken,
     setCaptchaContainer: store.setCaptchaContainer,
     isFinalizingRef: store.isFinalizingRef,
+    dispose: store.dispose,
   };
 }

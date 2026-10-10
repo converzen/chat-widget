@@ -1,6 +1,6 @@
 import type { ChatMessage } from './types';
 
-const HISTORY_STORAGE_KEY = 'cvz_chat_history';
+export const HISTORY_STORAGE_KEY = 'cvz_chat_history';
 
 /**
  * Base64, not encryption - there's no key (it ships in this same public JS
@@ -29,42 +29,56 @@ function deobfuscate(encoded: string): string {
  * reimplement obfuscation for - that themselves to get it; an integration
  * that needs its own backend or analytics should still supply its own
  * callbacks, which take priority over this default.
+ *
+ * `key` is `WidgetConfig.historyKey` - one localStorage entry per key, so a
+ * host page that switches between several personas can give each its own
+ * conversation (and, crucially, its own sessionId - cvz-chat continues a
+ * session with the persona it was created with, so a sessionId restored
+ * from another persona's history would keep talking to that persona).
  */
-export async function defaultSaveMessages(sessionId: string, messages: ChatMessage[]): Promise<void> {
-  try {
-    localStorage.setItem(HISTORY_STORAGE_KEY, obfuscate(JSON.stringify({ sessionId, messages })));
-  } catch {
-    // localStorage unavailable (private mode, disabled storage, quota) -
-    // history just won't persist across reloads.
+export function createDefaultHistory(key: string = HISTORY_STORAGE_KEY) {
+  async function save(sessionId: string, messages: ChatMessage[]): Promise<void> {
+    try {
+      localStorage.setItem(key, obfuscate(JSON.stringify({ sessionId, messages })));
+    } catch {
+      // localStorage unavailable (private mode, disabled storage, quota) -
+      // history just won't persist across reloads.
+    }
   }
-}
 
-/**
- * An empty `sessionId` (never a fabricated one) is what tells the widget to
- * start a fresh conversation via `POST /api/chat/completion/stream` rather
- * than continuing a session cvz-chat has never actually heard of - a
- * client-generated session id sent to `/continuation/stream` 404s there,
- * surfacing as a confusing "temporarily unavailable" error on literally the
- * first message from anyone with empty storage. Every return path here
- * must leave `sessionId` empty rather than inventing one.
- */
-export async function defaultLoadMessages(): Promise<{ sessionId: string; messages: ChatMessage[] }> {
-  const EMPTY = { sessionId: '', messages: [] };
-  try {
-    const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
-    if (!stored) {
+  /**
+   * An empty `sessionId` (never a fabricated one) is what tells the widget to
+   * start a fresh conversation via `POST /api/chat/completion/stream` rather
+   * than continuing a session cvz-chat has never actually heard of - a
+   * client-generated session id sent to `/continuation/stream` 404s there,
+   * surfacing as a confusing "temporarily unavailable" error on literally the
+   * first message from anyone with empty storage. Every return path here
+   * must leave `sessionId` empty rather than inventing one.
+   */
+  async function load(): Promise<{ sessionId: string; messages: ChatMessage[] }> {
+    const EMPTY = { sessionId: '', messages: [] };
+    try {
+      const stored = localStorage.getItem(key);
+      if (!stored) {
+        return EMPTY;
+      }
+      // Falls back to parsing `stored` directly as plain JSON, in case it was
+      // ever written by something that didn't obfuscate it.
+      let data: { sessionId?: string; messages?: ChatMessage[] };
+      try {
+        data = JSON.parse(deobfuscate(stored));
+      } catch {
+        data = JSON.parse(stored);
+      }
+      return { sessionId: data.sessionId || '', messages: data.messages || [] };
+    } catch {
       return EMPTY;
     }
-    // Falls back to parsing `stored` directly as plain JSON, in case it was
-    // ever written by something that didn't obfuscate it.
-    let data: { sessionId?: string; messages?: ChatMessage[] };
-    try {
-      data = JSON.parse(deobfuscate(stored));
-    } catch {
-      data = JSON.parse(stored);
-    }
-    return { sessionId: data.sessionId || '', messages: data.messages || [] };
-  } catch {
-    return EMPTY;
   }
+
+  return { save, load };
 }
+
+const defaultHistory = createDefaultHistory();
+export const defaultSaveMessages = defaultHistory.save;
+export const defaultLoadMessages = defaultHistory.load;

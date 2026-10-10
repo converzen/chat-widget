@@ -41,6 +41,7 @@ interface WidgetConfig {
     apiKey?: string;
     getToken?: (clientId: string | null) => Promise<string | TokenResponse>;
     persistMessages?: boolean;
+    historyKey?: string;
     headerMsg?: string;
     subheaderMsg?: string;
     initialGreeting?: string;
@@ -125,6 +126,11 @@ interface ChatCoreStore {
     isFinalizingRef: {
         current: boolean;
     };
+    /** Aborts any in-flight stream and drops pending frame callbacks - call
+     *  when the presentation unmounts (e.g. WidgetManager.hide() before a
+     *  re-init with a different persona), so a reply still streaming for the
+     *  old config doesn't keep running in the background. */
+    dispose(): void;
 }
 declare function createChatCore(config: WidgetConfig): ChatCoreStore;
 

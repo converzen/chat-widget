@@ -15,7 +15,7 @@
 import type { WidgetConfig, TokenResponse, ChatMessage } from '../types';
 import { streamChat } from '../services/streaming';
 import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterRejection, type CaptchaMount } from '../clientId';
-import { defaultSaveMessages, defaultLoadMessages } from '../history';
+import { createDefaultHistory } from '../history';
 import {
   clearEndUserAuth,
   isEndUserAuthValid,
@@ -68,6 +68,11 @@ export interface ChatCoreStore {
    *  default presentation for why (suppresses a one-frame flicker between
    *  the streaming bubble and the finalized message). */
   isFinalizingRef: { current: boolean };
+  /** Aborts any in-flight stream and drops pending frame callbacks - call
+   *  when the presentation unmounts (e.g. WidgetManager.hide() before a
+   *  re-init with a different persona), so a reply still streaming for the
+   *  old config doesn't keep running in the background. */
+  dispose(): void;
 }
 
 export function createChatCore(config: WidgetConfig): ChatCoreStore {
@@ -110,9 +115,10 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
   // config.onSaveMessages/onLoadMessages (a host app's own backend) take
   // priority over the built-in persistMessages/localStorage default.
   const persistMessages = config.persistMessages !== false;
-  const saveMessages = config.onSaveMessages ?? (persistMessages ? defaultSaveMessages : async () => {});
+  const defaultHistory = createDefaultHistory(config.historyKey);
+  const saveMessages = config.onSaveMessages ?? (persistMessages ? defaultHistory.save : async () => {});
   const loadMessagesFn =
-    config.onLoadMessages ?? (persistMessages ? defaultLoadMessages : async () => ({ sessionId: '', messages: [] }));
+    config.onLoadMessages ?? (persistMessages ? defaultHistory.load : async () => ({ sessionId: '', messages: [] }));
 
   let abortController: AbortController | null = null;
   let tokenCache: TokenResponse | null = null;
@@ -581,6 +587,21 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
     }
   }
 
+  function dispose(): void {
+    if (abortController) {
+      abortController.abort();
+      abortController = null;
+    }
+    if (rAF) {
+      cancelAnimationFrame(rAF);
+      rAF = null;
+    }
+    if (thinkingRAF) {
+      cancelAnimationFrame(thinkingRAF);
+      thinkingRAF = null;
+    }
+  }
+
   return {
     getState: () => state,
     subscribe(listener) {
@@ -596,5 +617,6 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
     getTenantAuthToken,
     setCaptchaContainer,
     isFinalizingRef,
+    dispose,
   };
 }

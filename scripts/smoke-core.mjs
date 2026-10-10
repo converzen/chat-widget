@@ -62,5 +62,22 @@ assert(
 
 unsubscribe();
 
+// historyKey: two stores with different keys must not see each other's
+// history (or sessionId) - the per-persona switching case.
+const b64 = (obj) => btoa(JSON.stringify(obj));
+localStorage.setItem('hk-a', b64({ sessionId: 'session-a', messages: [{ role: 'USER', content: 'from a', createdAt: '' }] }));
+const coreA = createChatCore({ chatUrl: 'http://127.0.0.1:1', getToken: async () => 'x', historyKey: 'hk-a' });
+const coreB = createChatCore({ chatUrl: 'http://127.0.0.1:1', getToken: async () => 'x', historyKey: 'hk-b' });
+await new Promise((resolve) => setTimeout(resolve, 50));
+assert(coreA.getState().sessionId === 'session-a', 'historyKey: restores the sessionId stored under its own key');
+assert(coreA.getState().messages[0]?.content === 'from a', 'historyKey: restores the messages stored under its own key');
+assert(coreB.getState().sessionId === null, 'historyKey: a different key starts without a sessionId');
+assert(coreB.getState().messages.length === 1 && coreB.getState().messages[0].role === 'SYSTEM', 'historyKey: a different key starts with just the greeting');
+await coreB.clearHistory();
+assert(localStorage.getItem('hk-a') !== null, 'historyKey: clearHistory() leaves other keys alone');
+coreA.dispose();
+coreB.dispose();
+assert(typeof coreA.dispose === 'function', 'dispose() is exposed and safe to call while idle');
+
 console.log(failures === 0 ? '\nAll smoke checks passed.' : `\n${failures} smoke check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

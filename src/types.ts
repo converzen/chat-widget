@@ -92,6 +92,12 @@ export interface WidgetConfig {
   // origin. Default true. Set false for session-only history (nothing
   // written, nothing restored - a fresh conversation every page load).
   persistMessages?: boolean;
+  // localStorage key the built-in persistence uses (default
+  // 'cvz_chat_history'). Give each persona its own key when one page
+  // switches between several - otherwise they share one conversation, and
+  // the restored sessionId keeps talking to whichever persona created it.
+  // Ignored when onSaveMessages/onLoadMessages are supplied.
+  historyKey?: string;
   headerMsg?: string;
   subheaderMsg?: string; // Optional subheader text below the title (default: "We typically reply in a few minutes")
   initialGreeting?: string;

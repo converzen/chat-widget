@@ -41,6 +41,7 @@ interface WidgetConfig {
     apiKey?: string;
     getToken?: (clientId: string | null) => Promise<string | TokenResponse>;
     persistMessages?: boolean;
+    historyKey?: string;
     headerMsg?: string;
     subheaderMsg?: string;
     initialGreeting?: string;
@@ -64,6 +65,7 @@ interface WidgetConfig {
 
 declare class WidgetManager {
     private hostElement;
+    private root;
     readonly buildId: string;
     init(config: WidgetConfig): void;
     hide(): void;
