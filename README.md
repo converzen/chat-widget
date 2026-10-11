@@ -194,6 +194,8 @@ If your `getToken` throws/rejects with cvz-chat's own `get_token` error text (`i
 
 If `WidgetConfig.publicId` is set (the non-secret id from your ConverZen dashboard, next to your API key), `clientId` is instead one cvz-chat itself issued and vouches for - see the "Client ID Protocol" design - rather than a self-generated value. Resolution starts when the visitor opens the widget (not on page load, so a CAPTCHA-gated account never runs a challenge before the visitor has done anything) and is memoized, so reopening doesn't repeat it. If your account requires a CAPTCHA, a small Cloudflare Turnstile or reCAPTCHA widget briefly appears above the message list while it resolves - deliberately real and visible rather than hidden, since a hidden or off-screen challenge measurably hurts its own solve rate. Without `publicId`, `clientId` falls back to the old self-generated, unverified value - no regression for integrations that haven't adopted it.
 
+A cvz-chat-issued `clientId` is only valid for the account that issued it, so the widget stores it per `publicId`. Widgets for different accounts on one origin (personas from several accounts on one page, or just `localhost` during development) each keep their own instead of overwriting each other's.
+
 ```javascript
 cvzWidget.init({
   // ...
@@ -220,7 +222,7 @@ function switchPersona(persona) {
 }
 ```
 
-Each persona's conversation stays put while you switch away and is restored when you switch back; "clear" only wipes the current key. The visitor's client_id and end-user login stay shared across all of them, since they identify the visitor, not the conversation.
+Each persona's conversation stays put while you switch away and is restored when you switch back; "clear" only wipes the current key. The end-user login stays shared across all of them, since it identifies the visitor, not the conversation. So does the client_id, as long as the personas belong to one account; personas from different accounts need that account's `publicId` each, and the widget keeps a client_id per account (see [Per-visitor rate limiting](#per-visitor-rate-limiting-clientid)).
 
 For your own backend, cross-device sync, or analytics, supply `onSaveMessages`/`onLoadMessages` instead - either one takes priority over the built-in `persistMessages` behavior when supplied:
 

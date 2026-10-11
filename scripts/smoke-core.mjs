@@ -79,5 +79,40 @@ coreA.dispose();
 coreB.dispose();
 assert(typeof coreA.dispose === 'function', 'dispose() is exposed and safe to call while idle');
 
+// client_id per account: two widgets for different accounts (publicIds) on
+// one origin must each keep their own server-issued client_id.
+const realFetch = globalThis.fetch;
+let issued = 0;
+globalThis.fetch = async (url, init) => {
+  if (String(url).endsWith('/api/chat/client_id')) {
+    const { widget_public_id } = JSON.parse(init.body);
+    issued++;
+    return new Response(JSON.stringify({ client_id: `cid-${widget_public_id}-${issued}` }), { status: 200 });
+  }
+  return realFetch(url, init);
+};
+async function clientIdFor(publicId) {
+  let seen;
+  const core = createChatCore({
+    chatUrl: 'http://cvz.test',
+    publicId,
+    persistMessages: false,
+    getToken: async (clientId) => { seen = clientId; return 'x'; },
+  });
+  await core.getTenantAuthToken();
+  core.dispose();
+  return seen;
+}
+
+localStorage.setItem('cvz_client_id_v2', 'cid-legacy');
+assert((await clientIdFor('acct-a')) === 'cid-legacy', 'client_id: the first account adopts a pre-existing unkeyed client_id');
+assert(localStorage.getItem('cvz_client_id_v2') === null, 'client_id: the unkeyed entry is gone after adoption');
+const firstB = await clientIdFor('acct-b');
+assert(firstB?.startsWith('cid-acct-b-'), 'client_id: a second account gets its own, freshly issued client_id');
+assert((await clientIdFor('acct-a')) === 'cid-legacy', 'client_id: switching back keeps the first account\'s client_id');
+assert((await clientIdFor('acct-b')) === firstB, 'client_id: ...and the second account\'s, without re-issuing');
+assert(issued === 1, 'client_id: only one issuance across all the switching');
+globalThis.fetch = realFetch;
+
 console.log(failures === 0 ? '\nAll smoke checks passed.' : `\n${failures} smoke check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

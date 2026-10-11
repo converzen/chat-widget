@@ -101,6 +101,19 @@ function writeStorage(key: string, value: string): void {
   }
 }
 
+/**
+ * A client_id is only valid for the account that issued it (cvz-chat's
+ * get_token rejects anything else with "client_id does not belong to this
+ * account"), so everything stored about it is kept per account - keyed by
+ * `publicId`. Otherwise two widgets for different accounts on one origin
+ * (several personas from different accounts on one page, or simply
+ * localhost during development) overwrite each other's client_id and
+ * trigger a rejection + forced reissue on every switch.
+ */
+function accountKey(key: string, publicId: string): string {
+  return `${key}:${publicId}`;
+}
+
 function clearStorage(key: string): void {
   try {
     localStorage.removeItem(key);
@@ -116,12 +129,36 @@ function clearStorage(key: string): void {
  * subsequent issuance so an account flipping the setting either way is
  * reflected within one issuance, not stuck on a stale first impression.
  */
-function isCaptchaGated(): boolean {
-  return readStorage(CAPTCHA_GATED_STORAGE_KEY) === '1';
+function isCaptchaGated(publicId: string): boolean {
+  return readStorage(accountKey(CAPTCHA_GATED_STORAGE_KEY, publicId)) === '1';
 }
 
-function setCaptchaGated(gated: boolean): void {
-  writeStorage(CAPTCHA_GATED_STORAGE_KEY, gated ? '1' : '0');
+function setCaptchaGated(publicId: string, gated: boolean): void {
+  writeStorage(accountKey(CAPTCHA_GATED_STORAGE_KEY, publicId), gated ? '1' : '0');
+}
+
+/**
+ * Before client_ids were stored per account, there was one unkeyed entry
+ * per origin. The first account to ask adopts it (and the unkeyed copies
+ * go), so the usual single-account integration keeps its visitors'
+ * client_ids instead of re-issuing (and possibly re-challenging) everyone.
+ * If it actually belonged to another account, get_token rejects it and
+ * refreshClientIdAfterRejection replaces it as usual.
+ */
+function adoptUnkeyedClientId(publicId: string): string | null {
+  const unkeyed = readStorage(SERVER_CLIENT_ID_STORAGE_KEY);
+  if (!unkeyed) {
+    return null;
+  }
+  writeStorage(accountKey(SERVER_CLIENT_ID_STORAGE_KEY, publicId), unkeyed);
+  const gated = readStorage(CAPTCHA_GATED_STORAGE_KEY);
+  if (gated !== null) {
+    writeStorage(accountKey(CAPTCHA_GATED_STORAGE_KEY, publicId), gated);
+  }
+  clearStorage(SERVER_CLIENT_ID_STORAGE_KEY);
+  clearStorage(CAPTCHA_GATED_STORAGE_KEY);
+  clearStorage(LAST_FORCED_REISSUE_STORAGE_KEY);
+  return unkeyed;
 }
 
 /**
@@ -310,7 +347,7 @@ export async function getOrCreateClientId(
     return generateLocalClientId();
   }
 
-  const cached = readStorage(SERVER_CLIENT_ID_STORAGE_KEY);
+  const cached = readStorage(accountKey(SERVER_CLIENT_ID_STORAGE_KEY, publicId)) ?? adoptUnkeyedClientId(publicId);
   if (cached) {
     return cached;
   }
@@ -339,10 +376,10 @@ export async function getOrCreateClientId(
     // Only recorded on a completed round trip, not a network failure above -
     // a transient error shouldn't overwrite what we last actually learned
     // about this account's setting.
-    setCaptchaGated(gated);
+    setCaptchaGated(publicId, gated);
 
     const data = (await res.json()) as { client_id: string };
-    writeStorage(SERVER_CLIENT_ID_STORAGE_KEY, data.client_id);
+    writeStorage(accountKey(SERVER_CLIENT_ID_STORAGE_KEY, publicId), data.client_id);
     // Upgrade complete - the old self-generated value (if this browser ever
     // had one, from before `publicId` was configured) is now dead weight.
     clearStorage(LEGACY_CLIENT_ID_STORAGE_KEY);
@@ -383,13 +420,16 @@ export async function refreshClientIdAfterRejection(
     return null;
   }
 
-  if (!isCaptchaGated()) {
-    const last = Number(readStorage(LAST_FORCED_REISSUE_STORAGE_KEY) ?? '0');
+  const clientIdKey = accountKey(SERVER_CLIENT_ID_STORAGE_KEY, publicId);
+  const lastReissueKey = accountKey(LAST_FORCED_REISSUE_STORAGE_KEY, publicId);
+
+  if (!isCaptchaGated(publicId)) {
+    const last = Number(readStorage(lastReissueKey) ?? '0');
     if (Date.now() - last < FORCED_REISSUE_COOLDOWN_MS) {
       // Too soon - drop the known-bad id and proceed without one this round
       // rather than re-hit /api/chat/client_id; cvz-chat accepts a missing
       // client_id until enforcement is turned on.
-      clearStorage(SERVER_CLIENT_ID_STORAGE_KEY);
+      clearStorage(clientIdKey);
       return null;
     }
   }
@@ -397,7 +437,7 @@ export async function refreshClientIdAfterRejection(
   // Recorded before attempting (not after, and not only on success) so a
   // run of failures - cvz-chat briefly unreachable, say - can't retry
   // faster than the cooldown either.
-  writeStorage(LAST_FORCED_REISSUE_STORAGE_KEY, String(Date.now()));
-  clearStorage(SERVER_CLIENT_ID_STORAGE_KEY);
+  writeStorage(lastReissueKey, String(Date.now()));
+  clearStorage(clientIdKey);
   return getOrCreateClientId(baseUrl, publicId, mount);
 }
