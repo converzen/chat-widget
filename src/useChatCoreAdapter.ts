@@ -13,6 +13,16 @@ import type { WidgetConfig } from './types';
 
 export type ChatCoreAdapterResult = ChatCoreState & Omit<ChatCoreStore, 'getState' | 'subscribe'>;
 
+// The default widget's live store, so WidgetManager (window.cvzWidget) can
+// reach it for imperative calls like addCards() - the store itself is
+// created inside the Preact tree. At most one default widget is mounted at
+// a time (WidgetManager.init refuses a second).
+let mountedStore: ChatCoreStore | null = null;
+
+export function getMountedStore(): ChatCoreStore | null {
+  return mountedStore;
+}
+
 export function useChatCoreAdapter(config: WidgetConfig): ChatCoreAdapterResult {
   const store = useMemo(() => createChatCore(config), [config]);
   // No getServerSnapshot here - preact/compat's shim (unlike React's real
@@ -23,7 +33,13 @@ export function useChatCoreAdapter(config: WidgetConfig): ChatCoreAdapterResult 
 
   // Stop a still-streaming reply when this store is dropped (unmount, or a
   // new config).
-  useEffect(() => () => store.dispose(), [store]);
+  useEffect(() => {
+    mountedStore = store;
+    return () => {
+      if (mountedStore === store) mountedStore = null;
+      store.dispose();
+    };
+  }, [store]);
 
   return {
     ...state,
@@ -35,6 +51,7 @@ export function useChatCoreAdapter(config: WidgetConfig): ChatCoreAdapterResult 
     deauthenticateEndUser: store.deauthenticateEndUser,
     getTenantAuthToken: store.getTenantAuthToken,
     setCaptchaContainer: store.setCaptchaContainer,
+    addCards: store.addCards,
     isFinalizingRef: store.isFinalizingRef,
     dispose: store.dispose,
   };

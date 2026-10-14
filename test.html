@@ -43,6 +43,16 @@
                       //   getToken: async () => "mock-jwt-token", // Simple string token
                       //   getToken: async () => ({ token: "mock-jwt-token", expiresAt: Date.now() + 3600000 }), // With expiration
                       onSaveMessages: async (m) => console.log("Saving:", m),
+                      // Demo of the card hook: every answer gets one sponsored
+                      // and one plain card (replace with a call to your backend).
+                      onUserMessage: (e) => console.log("User message:", e),
+                      onAssistantMessage: async ({ question, answer }) => {
+                          console.log("Assistant message:", { question, answer });
+                          return [
+                              { title: "Nudelmaschine", url: "https://www.example.com/nudelmaschine", merchant: "Beispiel-Shop", description: "Für frische Pasta" },
+                              { title: "Mehr im Magazin", url: "https://www.example.com/magazin", sponsored: false },
+                          ];
+                      },
                       onLoadMessages: async () => {
                           console.log("Loading messages...");
                           return []; // Return empty array to see the initialGreeting

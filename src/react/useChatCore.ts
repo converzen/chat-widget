@@ -55,6 +55,7 @@ export function useChatCore(config: WidgetConfig): UseChatCoreResult {
     deauthenticateEndUser: store.deauthenticateEndUser,
     getTenantAuthToken: store.getTenantAuthToken,
     setCaptchaContainer: store.setCaptchaContainer,
+    addCards: store.addCards,
     isFinalizingRef: store.isFinalizingRef,
     dispose: store.dispose,
   };

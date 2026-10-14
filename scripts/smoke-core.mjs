@@ -114,5 +114,101 @@ assert((await clientIdFor('acct-b')) === firstB, 'client_id: ...and the second a
 assert(issued === 1, 'client_id: only one issuance across all the switching');
 globalThis.fetch = realFetch;
 
+// --- onUserMessage / onAssistantMessage hooks and cards, against a fake SSE
+// stream (fetch mocked; rAF polyfilled since Node has none).
+globalThis.requestAnimationFrame ??= (cb) => setTimeout(cb, 0);
+globalThis.cancelAnimationFrame ??= (id) => clearTimeout(id);
+const sseFetch = (answer) => async () => {
+  const events = [
+    { type: 'session_created', session_id: 'sess-1' },
+    ...answer.split(' ').map((w, i) => ({ type: 'token', content: (i ? ' ' : '') + w })),
+    { type: 'done' },
+  ];
+  const body = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
+  return new Response(new ReadableStream({
+    start(c) { c.enqueue(new TextEncoder().encode(body)); c.close(); },
+  }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+};
+const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
+
+{
+  globalThis.fetch = sseFetch('Nimm die Nudelmaschine');
+  const userEvents = [];
+  const hookEvents = [];
+  const saved = [];
+  const core = createChatCore({
+    chatUrl: 'http://chat.test',
+    getToken: async () => 'x',
+    onSaveMessages: async (sessionId, messages) => { saved.push(messages); },
+    onLoadMessages: async () => ({ sessionId: '', messages: [] }),
+    onUserMessage: (e) => userEvents.push(e),
+    onAssistantMessage: async (e) => {
+      hookEvents.push(e);
+      return [
+        { title: 'Nudelmaschine', url: 'https://www.amazon.de/dp/B1?tag=x', merchant: 'Amazon', imageUrl: 'javascript:alert(1)' },
+        { title: 'Kein Link', url: 'javascript:alert(1)' },
+        { title: '', url: 'https://x.test' },
+        { title: 'Unbezahlt', url: 'https://x.test/a', sponsored: false },
+      ];
+    },
+  });
+  await settle();
+  await core.sendMessage('Wie mache ich Pasta?');
+  await settle();
+  const msgs = core.getState().messages;
+  const answer = msgs.find((m) => m.role === 'ASSISTANT');
+  assert(userEvents.length === 1 && userEvents[0].question === 'Wie mache ich Pasta?', 'hooks: onUserMessage gets the question');
+  assert(hookEvents.length === 1 && hookEvents[0].answer === 'Nimm die Nudelmaschine' && hookEvents[0].question === 'Wie mache ich Pasta?' && hookEvents[0].sessionId === 'sess-1', 'hooks: onAssistantMessage gets question, full answer and sessionId');
+  assert(answer?.cards?.length === 2, 'cards: invalid cards (no title, non-http url) are dropped');
+  assert(answer?.cards?.[0].sponsored === true && answer.cards[0].imageUrl === undefined, 'cards: sponsored defaults to true, a non-http imageUrl is dropped');
+  assert(answer?.cards?.[1].sponsored === false, 'cards: an explicit sponsored:false is kept');
+  assert(saved.at(-1)?.find((m) => m.role === 'ASSISTANT')?.cards?.length === 2, 'cards: persisted via onSaveMessages');
+
+  core.addCards([{ title: 'Wok', url: 'https://x.test/wok' }]);
+  const replaced = core.getState().messages.find((m) => m.role === 'ASSISTANT');
+  assert(replaced?.cards?.length === 1 && replaced.cards[0].title === 'Wok', 'addCards(): replaces the latest assistant message\'s cards');
+  core.dispose();
+}
+
+{
+  globalThis.fetch = sseFetch('Antwort');
+  const core = createChatCore({
+    chatUrl: 'http://chat.test',
+    getToken: async () => 'x',
+    persistMessages: false,
+    onAssistantMessage: async () => { throw new Error('backend down'); },
+  });
+  await settle();
+  const realError = console.error;
+  console.error = () => {};
+  await core.sendMessage('Frage');
+  await settle();
+  console.error = realError;
+  const st = core.getState();
+  assert(st.messages.some((m) => m.role === 'ASSISTANT' && m.content === 'Antwort' && !m.cards), 'hooks: a failing onAssistantMessage leaves the answer intact, no cards');
+  assert(st.isStreaming === false && !st.messages.some((m) => m.role === 'SYSTEM' && m.content.includes('Error')), 'hooks: a failing hook is not surfaced as a chat error');
+  core.dispose();
+}
+
+{
+  globalThis.fetch = sseFetch('Antwort');
+  let resolveHook;
+  const core = createChatCore({
+    chatUrl: 'http://chat.test',
+    getToken: async () => 'x',
+    persistMessages: false,
+    onAssistantMessage: () => new Promise((resolve) => { resolveHook = resolve; }),
+  });
+  await settle();
+  await core.sendMessage('Frage');
+  await settle();
+  await core.clearHistory();
+  resolveHook([{ title: 'Zu spät', url: 'https://x.test' }]);
+  await settle();
+  assert(!core.getState().messages.some((m) => m.cards), 'cards: arriving after clearHistory() are dropped');
+  core.dispose();
+}
+globalThis.fetch = realFetch;
+
 console.log(failures === 0 ? '\nAll smoke checks passed.' : `\n${failures} smoke check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

@@ -3,6 +3,31 @@ export interface ChatMessage {
   role: 'USER' | 'ASSISTANT' | 'SYSTEM'
   createdAt: string
   sources?: string[]
+  // Cards a host attached to this (assistant) message via onAssistantMessage
+  // or cvzWidget.addCards() - rendered below the message bubble.
+  cards?: ChatCard[]
+}
+
+// A link card shown below an assistant message - e.g. a product
+// recommendation. Rendered by the widget itself (never as raw HTML), so a
+// sponsored card always carries its label and rel="sponsored".
+export interface ChatCard {
+  title: string
+  url: string          // http(s) only - other cards are dropped
+  description?: string
+  imageUrl?: string    // http(s) only - ignored otherwise
+  merchant?: string
+  // Advertising/affiliate link. Default true: a sponsored card always shows
+  // the `sponsoredLabel` (e.g. "Anzeige") and gets rel="sponsored". Only an
+  // explicit `false` renders a plain, unlabelled card.
+  sponsored?: boolean
+}
+
+// What onAssistantMessage receives once an answer is complete.
+export interface AssistantMessageEvent {
+  question: string     // the user message the answer replied to
+  answer: string       // the complete answer text
+  sessionId: string
 }
 
 // Selects which persona/version a chat request is routed to. Field names match the
@@ -143,6 +168,18 @@ export interface WidgetConfig {
   // launcher click - e.g. a host app's own "ask about this" button that
   // re-inits the widget with different `extraContext`. Default false.
   autoOpen?: boolean;
+  // Called with the user's message right after it is sent. Reporting only -
+  // the return value is ignored and errors are swallowed.
+  onUserMessage?: (event: { question: string; sessionId: string | null }) => void;
+  // Called once per completed assistant answer (not for errors or aborted
+  // replies). May return cards (or a Promise of them) to show below that
+  // answer - e.g. product recommendations a host looks up on its own
+  // backend. Runs after the answer is finalized and never delays or breaks
+  // the chat: a rejected/slow Promise just means no cards. Invalid cards
+  // (no title, non-http(s) url) are dropped, at most 5 are shown.
+  onAssistantMessage?: (event: AssistantMessageEvent) => ChatCard[] | void | Promise<ChatCard[] | void>;
+  // Label shown on every sponsored card (default "Anzeige").
+  sponsoredLabel?: string;
 }
 
 export interface ChatModalConfig {

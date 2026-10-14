@@ -12,7 +12,7 @@
  * infinite-loop otherwise.
  */
 
-import type { WidgetConfig, TokenResponse, ChatMessage } from '../types';
+import type { WidgetConfig, TokenResponse, ChatMessage, ChatCard } from '../types';
 import { streamChat } from '../services/streaming';
 import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterRejection, type CaptchaMount } from '../clientId';
 import { createDefaultHistory } from '../history';
@@ -29,6 +29,41 @@ import {
 
 const DEFAULT_CHAT_API_URL = 'https://chat.converzen.de';
 const DEFAULT_INITIAL_GREETING = 'Hi, how can I help you ?';
+const MAX_CARDS = 5;
+
+function isHttpUrl(value: unknown): value is string {
+  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+}
+
+function optionalText(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+/**
+ * Keeps only well-formed cards (non-empty title, http(s) url), normalized to
+ * plain data - whatever a host hands in, the presentation only ever sees
+ * these fields. Exported for tests and alternative presentations.
+ */
+export function sanitizeCards(input: unknown): ChatCard[] {
+  if (!Array.isArray(input)) return [];
+  const cards: ChatCard[] = [];
+  for (const raw of input) {
+    if (cards.length >= MAX_CARDS) break;
+    if (!raw || typeof raw !== 'object') continue;
+    const c = raw as Record<string, unknown>;
+    const title = optionalText(c.title);
+    if (!title || !isHttpUrl(c.url)) continue;
+    cards.push({
+      title,
+      url: c.url.trim(),
+      description: optionalText(c.description),
+      imageUrl: isHttpUrl(c.imageUrl) ? c.imageUrl.trim() : undefined,
+      merchant: optionalText(c.merchant),
+      sponsored: c.sponsored !== false,
+    });
+  }
+  return cards;
+}
 
 export interface ChatCoreState {
   messages: ChatMessage[];
@@ -68,6 +103,10 @@ export interface ChatCoreStore {
    *  default presentation for why (suppresses a one-frame flicker between
    *  the streaming bubble and the finalized message). */
   isFinalizingRef: { current: boolean };
+  /** Attaches cards to the latest assistant message (replacing any it had)
+   *  and persists them - the imperative counterpart to returning cards from
+   *  config.onAssistantMessage. Invalid cards are dropped. */
+  addCards(cards: ChatCard[]): void;
   /** Aborts any in-flight stream and drops pending frame callbacks - call
    *  when the presentation unmounts (e.g. WidgetManager.hide() before a
    *  re-init with a different persona), so a reply still streaming for the
@@ -319,6 +358,7 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
               }, 0);
 
               await saveMessages(currentSessionId, finalMessages);
+              runAssistantMessageHook(userMessage.content, assistantMessage, currentSessionId);
             } else {
               setState({
                 streamingMessage: '',
@@ -428,6 +468,35 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
     }
   }
 
+  /** Replaces `target`'s cards (matched by identity, so a message that was
+   *  cleared away meanwhile is simply not found) and persists. */
+  function attachCards(target: ChatMessage, cards: ChatCard[]): void {
+    if (cards.length === 0) return;
+    const index = state.messages.indexOf(target);
+    if (index === -1) return;
+    const messages = state.messages.slice();
+    messages[index] = { ...target, cards };
+    setState({ messages });
+    void saveMessages(state.sessionId || '', messages).catch((error) =>
+      console.error('cvzWidget: failed to save cards', error),
+    );
+  }
+
+  /** Fire-and-forget: a host hook must never delay or break the chat. */
+  function runAssistantMessageHook(question: string, message: ChatMessage, sessionId: string): void {
+    const hook = config.onAssistantMessage;
+    if (!hook) return;
+    Promise.resolve()
+      .then(() => hook({ question, answer: message.content, sessionId }))
+      .then((result) => attachCards(message, sanitizeCards(result)))
+      .catch((error) => console.error('cvzWidget: onAssistantMessage failed', error));
+  }
+
+  function addCards(cards: ChatCard[]): void {
+    const latest = [...state.messages].reverse().find((m) => m.role === 'ASSISTANT');
+    if (latest) attachCards(latest, sanitizeCards(cards));
+  }
+
   async function sendMessage(text: string): Promise<void> {
     if (!text.trim() || state.isStreaming) return;
 
@@ -440,6 +509,14 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
       role: 'USER',
       createdAt: new Date().toISOString(),
     };
+
+    if (config.onUserMessage) {
+      try {
+        config.onUserMessage({ question: userMessage.content, sessionId: state.sessionId });
+      } catch (error) {
+        console.error('cvzWidget: onUserMessage failed', error);
+      }
+    }
 
     const updatedMessages = [...state.messages, userMessage];
     setState({
@@ -616,6 +693,7 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
     deauthenticateEndUser,
     getTenantAuthToken,
     setCaptchaContainer,
+    addCards,
     isFinalizingRef,
     dispose,
   };
