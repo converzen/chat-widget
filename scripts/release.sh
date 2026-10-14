@@ -77,7 +77,7 @@ git add -f dist
 git commit -q -m "$TAG (built dist)"
 git tag -a "$TAG" -m "$TAG"
 git switch -q "$RELEASE_BRANCH"
-echo ">>> tagged $TAG ($(git rev-parse --short "$TAG")), $(git ls-tree -r --name-only "$TAG" dist | wc -l) dist files"
+echo ">>> tagged $TAG ($(git rev-parse --short "$TAG^{commit}")), $(git ls-tree -r --name-only "$TAG" dist | wc -l) dist files"
 
 if $PUSH; then
     git push origin "$RELEASE_BRANCH" "$TAG"
