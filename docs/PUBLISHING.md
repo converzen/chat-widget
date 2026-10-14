@@ -8,7 +8,7 @@ This guide explains how to publish the ConverZen Chat Widget to npm, GitHub, and
 > case, ESM, and a genuine CJS build - `require('@converzen/chat-widget')` used to silently
 > return `{}` because `main`/the `require` condition pointed at the side-effecting IIFE file,
 > which has no exports; there's now a dedicated `dist/cvz-widget.cjs` for that), and a `LICENSE`
-> file is included. There are no GitHub releases yet (see §2 below). Production still reaches
+> file is included. Git-dependency releases are tags with a built `dist/` (see §2 below). Production still reaches
 > `converzen.de` via `cvz-infra/deploy/deploy.sh --prod`, serving `dist/` from
 > `https://converzen.de/widget/latest/` - npm/unpkg/jsDelivr are an additional distribution
 > channel for third-party integrators, not a replacement for that deploy path.
@@ -91,31 +91,40 @@ Once published, users can use via npm CDNs:
 The repository already exists at `git@github.com:converzen/chat-widget.git` and `package.json`'s
 `repository`/`bugs`/`homepage` fields already point at it - no setup needed here, only releases:
 
-### GitHub Releases
+### Releases (git tags with a built `dist/`)
 
-1. **Create a release**:
-   - Go to GitHub repository → Releases → "Create a new release"
-   - Tag: `v1.0.0` (match package.json version)
-   - Title: `v1.0.0`
-   - Description: Release notes
+`gmc-v2` and `cvz-web` install this package as a git dependency pinned to a tag
+(`"@converzen/chat-widget": "github:converzen/chat-widget#v1.3.1"`). `dist/` is **not tracked on
+any branch** (it is in `.gitignore`, so generated bundles never cause merge conflicts); instead
+each release tag points at a commit that adds the built `dist/` on top of the release commit and
+sits on no branch.
 
-2. **Upload build artifacts** (optional):
-   - Upload `dist/cvz-widget.js` as a release asset
-   - Users can download directly or use via jsDelivr
+Cut a release from `main` with:
+
+```bash
+scripts/release.sh 1.3.2          # or patch | minor | major
+git push origin main v1.3.2       # or pass --push to the script
+```
+
+The script bumps `package.json`/`package-lock.json` and commits `release vX.Y.Z` on `main`, runs
+`npm ci`, `npm run build`, `npm run smoke`, then commits `dist/` on a detached HEAD and tags it.
+Check with `git ls-tree -r --name-only v1.3.2 dist` (should list the build) and
+`git branch --contains v1.3.2` (should be empty).
+
+Consumers must pin **tags** (`#vX.Y.Z`), never a branch: branches have no `dist/`.
+
+When merging an old branch that still tracks `dist/`, git reports modify/delete conflicts on
+`dist/*`; resolve them with `git rm -r --cached dist` and continue the merge.
 
 ### Using GitHub CDN (jsDelivr)
 
-If you upload `dist/cvz-widget.js` to releases:
+Release tags contain `dist/`, so jsDelivr can serve them straight from GitHub:
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/converzen/chat-widget@v1.0.0/dist/cvz-widget.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/converzen/chat-widget@v1.3.2/dist/cvz-widget.js"></script>
 ```
 
-Or from main branch:
-
-```html
-<script src="https://cdn.jsdelivr.net/gh/converzen/chat-widget@main/dist/cvz-widget.js"></script>
-```
+(`@main` or any other branch does **not** work, because branches don't contain `dist/`.)
 
 ## 3. CDN Hosting
 
@@ -170,7 +179,7 @@ Follow [semver](https://semver.org/):
 ### Versioning Strategy
 
 - **npm**: Use `npm version` command
-- **GitHub**: Tag releases with `v1.0.0` format
+- **GitHub**: `scripts/release.sh` creates `vX.Y.Z` tags with the built `dist/`
 - **CDN**: Organize files by version number
 
 ## Checklist Before Publishing
