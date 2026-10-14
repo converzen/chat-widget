@@ -3,6 +3,20 @@ interface ChatMessage {
     role: 'USER' | 'ASSISTANT' | 'SYSTEM';
     createdAt: string;
     sources?: string[];
+    cards?: ChatCard[];
+}
+interface ChatCard {
+    title: string;
+    url: string;
+    description?: string;
+    imageUrl?: string;
+    merchant?: string;
+    sponsored?: boolean;
+}
+interface AssistantMessageEvent {
+    question: string;
+    answer: string;
+    sessionId: string;
 }
 interface ChatPersonaIdentifier {
     alias?: string;
@@ -61,6 +75,12 @@ interface WidgetConfig {
     }>;
     extraContext?: Record<string, unknown>;
     autoOpen?: boolean;
+    onUserMessage?: (event: {
+        question: string;
+        sessionId: string | null;
+    }) => void;
+    onAssistantMessage?: (event: AssistantMessageEvent) => ChatCard[] | void | Promise<ChatCard[] | void>;
+    sponsoredLabel?: string;
 }
 
 interface EndUserAuth {
@@ -84,6 +104,12 @@ interface EndUserAuth {
  * infinite-loop otherwise.
  */
 
+/**
+ * Keeps only well-formed cards (non-empty title, http(s) url), normalized to
+ * plain data - whatever a host hands in, the presentation only ever sees
+ * these fields. Exported for tests and alternative presentations.
+ */
+declare function sanitizeCards(input: unknown): ChatCard[];
 interface ChatCoreState {
     messages: ChatMessage[];
     sessionId: string | null;
@@ -126,6 +152,10 @@ interface ChatCoreStore {
     isFinalizingRef: {
         current: boolean;
     };
+    /** Attaches cards to the latest assistant message (replacing any it had)
+     *  and persists them - the imperative counterpart to returning cards from
+     *  config.onAssistantMessage. Invalid cards are dropped. */
+    addCards(cards: ChatCard[]): void;
     /** Aborts any in-flight stream and drops pending frame callbacks - call
      *  when the presentation unmounts (e.g. WidgetManager.hide() before a
      *  re-init with a different persona), so a reply still streaming for the
@@ -186,4 +216,4 @@ declare const getDialogSize: (style?: WidgetStyle) => StyleObject;
 declare const getFrameColor: (style?: WidgetStyle) => string;
 declare const getButtonColors: (style?: WidgetStyle, isOpen?: boolean) => StyleObject;
 
-export { type CaptchaMount, type ChatCoreState, type ChatCoreStore, type ChatMessage, type ChatPersonaIdentifier, DIALOG_MAX_HEIGHT, DIALOG_MAX_WIDTH, type EndUserAuth, type TokenResponse, type WidgetConfig, type WidgetIcons, type WidgetStyle, createChatCore, getButtonColors, getDialogSize, getFrameColor, getPositionStyles };
+export { type AssistantMessageEvent, type CaptchaMount, type ChatCard, type ChatCoreState, type ChatCoreStore, type ChatMessage, type ChatPersonaIdentifier, DIALOG_MAX_HEIGHT, DIALOG_MAX_WIDTH, type EndUserAuth, type TokenResponse, type WidgetConfig, type WidgetIcons, type WidgetStyle, createChatCore, getButtonColors, getDialogSize, getFrameColor, getPositionStyles, sanitizeCards };

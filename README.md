@@ -259,6 +259,50 @@ cvzWidget.init({
 
 Unlike `persona` (first message of a session only), `extraContext` is sent on every call.
 
+### Reacting to messages, link cards
+
+Two hooks let the host page follow the conversation and add content of its
+own without touching the chat backend:
+
+- `onUserMessage({ question, sessionId })` - called right after the visitor
+  sends a message. Reporting only (analytics etc.); the return value is
+  ignored.
+- `onAssistantMessage({ question, answer, sessionId })` - called once per
+  completed answer (not for errors or aborted replies). It may return cards,
+  or a Promise of them, to show below that answer - e.g. product
+  recommendations the host looks up on its own backend:
+
+```javascript
+window.cvzWidget.init({
+  // ...
+  onAssistantMessage: async ({ question, answer }) => {
+    const res = await fetch('/api/chatbot/suggestions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, answer }),
+    });
+    const { cards } = await res.json();
+    return cards.map((c) => ({ title: c.title, url: c.url, merchant: c.merchant, imageUrl: c.image_url }));
+  },
+  sponsoredLabel: 'Anzeige', // default
+});
+```
+
+The hook runs after the answer is finalized and never delays or breaks the
+chat: a rejected or slow Promise just means no cards. Cards are plain data
+(`ChatCard`, see below) rendered by the widget itself - never HTML - and
+saved with the message (`onSaveMessages`/built-in history). Invalid cards (no
+title, a non-http(s) `url`) are dropped; at most 5 are shown.
+
+**Sponsored cards:** a card is treated as advertising unless it sets
+`sponsored: false`. A sponsored card always shows `sponsoredLabel` (default
+"Anzeige") and its link gets `rel="sponsored noopener noreferrer"` - the
+label can be renamed, not removed, so affiliate/ad links stay recognisable
+as such (e.g. UWG §5a / DDG §6 in Germany).
+
+`window.cvzWidget.addCards(cards)` is the imperative alternative: it attaches
+cards to the latest assistant message (replacing any it had).
+
 ### Opening the panel programmatically
 
 `autoOpen: true` starts the chat panel already open on mount, instead of waiting for a launcher click. Combine it with re-initializing the widget (`cvzWidget.hide()` then `cvzWidget.init({...})`) to pop the panel open with different config/context from your own UI:
@@ -390,6 +434,9 @@ Restyles the header, message bubbles, input, and Markdown content for a dark bac
 | `onLoadMessages` | `() => Promise<{sessionId: string, messages: ChatMessage[]}>` | No | - | Your own history backend - see [Message persistence](#message-persistence) |
 | `extraContext` | `Record<string, unknown>` | No | - | Extra fields merged into every completion/continuation request - see [Extra context per message](#extra-context-per-message) |
 | `autoOpen` | `boolean` | No | `false` | Start the panel open on mount - see [Opening the panel programmatically](#opening-the-panel-programmatically) |
+| `onUserMessage` | `(e: {question: string, sessionId: string \| null}) => void` | No | - | Called after the visitor sends a message - see [Reacting to messages, link cards](#reacting-to-messages-link-cards) |
+| `onAssistantMessage` | `(e: AssistantMessageEvent) => ChatCard[] \| void \| Promise<ChatCard[] \| void>` | No | - | Called once per completed answer; may return cards to show below it - see [Reacting to messages, link cards](#reacting-to-messages-link-cards) |
+| `sponsoredLabel` | `string` | No | `'Anzeige'` | Label on every sponsored card |
 | `endUserLicensing` | `boolean` | No | `false` | Enable end-user magic-link auth and credits/subscription purchase - see [End-user licensing](#end-user-licensing-magic-link-auth--credits) |
 
 *Either `apiKey` or `getToken` must be provided.
@@ -404,6 +451,26 @@ interface ChatMessage {
   role: 'USER' | 'ASSISTANT' | 'SYSTEM';
   createdAt: string; // ISO 8601
   sources?: string[];
+  cards?: ChatCard[]; // set by onAssistantMessage / addCards()
+}
+```
+
+### `ChatCard`
+
+```typescript
+interface ChatCard {
+  title: string;
+  url: string;          // http(s) only - other cards are dropped
+  description?: string;
+  imageUrl?: string;    // http(s) only - ignored otherwise
+  merchant?: string;
+  sponsored?: boolean;  // default true: labelled, rel="sponsored"
+}
+
+interface AssistantMessageEvent {
+  question: string;     // the user message the answer replied to
+  answer: string;       // the complete answer text
+  sessionId: string;
 }
 ```
 

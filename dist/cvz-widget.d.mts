@@ -3,6 +3,20 @@ interface ChatMessage {
     role: 'USER' | 'ASSISTANT' | 'SYSTEM';
     createdAt: string;
     sources?: string[];
+    cards?: ChatCard[];
+}
+interface ChatCard {
+    title: string;
+    url: string;
+    description?: string;
+    imageUrl?: string;
+    merchant?: string;
+    sponsored?: boolean;
+}
+interface AssistantMessageEvent {
+    question: string;
+    answer: string;
+    sessionId: string;
 }
 interface ChatPersonaIdentifier {
     alias?: string;
@@ -61,6 +75,12 @@ interface WidgetConfig {
     }>;
     extraContext?: Record<string, unknown>;
     autoOpen?: boolean;
+    onUserMessage?: (event: {
+        question: string;
+        sessionId: string | null;
+    }) => void;
+    onAssistantMessage?: (event: AssistantMessageEvent) => ChatCard[] | void | Promise<ChatCard[] | void>;
+    sponsoredLabel?: string;
 }
 
 declare class WidgetManager {
@@ -68,6 +88,7 @@ declare class WidgetManager {
     private root;
     readonly buildId: string;
     init(config: WidgetConfig): void;
+    addCards(cards: ChatCard[]): void;
     hide(): void;
 }
 declare const cvzWidget: WidgetManager;
@@ -77,4 +98,4 @@ declare global {
     }
 }
 
-export { type ChatMessage, type ChatPersonaIdentifier, type TokenResponse, type WidgetConfig, type WidgetIcons, type WidgetStyle, cvzWidget as default };
+export { type AssistantMessageEvent, type ChatCard, type ChatMessage, type ChatPersonaIdentifier, type TokenResponse, type WidgetConfig, type WidgetIcons, type WidgetStyle, cvzWidget as default };

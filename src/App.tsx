@@ -2,7 +2,7 @@
 import { createElement } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ComponentChildren, RefObject } from 'preact';
-import { WidgetConfig, WidgetStyle, WidgetIcons, ChatMessage } from './types';
+import { WidgetConfig, WidgetStyle, WidgetIcons, ChatMessage, ChatCard } from './types';
 import { isEndUserAuthValid, loadLastKnownEmail } from './endUserAuth';
 import { EndUserAuthModal } from './EndUserAuthModal';
 import { useChatCoreAdapter } from './useChatCoreAdapter';
@@ -198,6 +198,66 @@ const MessageContent = ({
   return createElement('span', null, content);
 };
 
+const DEFAULT_SPONSORED_LABEL = 'Anzeige';
+
+// Cards a host attached to an assistant message (config.onAssistantMessage /
+// cvzWidget.addCards) - e.g. product recommendations. Rendered from plain
+// data, never raw HTML, so a sponsored card can't lose its label or
+// rel="sponsored".
+const MessageCards = ({
+  cards,
+  sponsoredLabel,
+  darkMode,
+}: {
+  cards: ChatCard[];
+  sponsoredLabel?: string;
+  darkMode?: boolean;
+}) => (
+  <div className="cvz-mt-2 cvz-flex cvz-flex-col cvz-gap-2" data-cvz-cards>
+    {cards.map((card) => {
+      const sponsored = card.sponsored !== false;
+      return (
+        <a
+          key={card.url}
+          href={card.url}
+          target="_blank"
+          rel={sponsored ? 'sponsored noopener noreferrer' : 'noopener noreferrer'}
+          className={`cvz-flex cvz-gap-3 cvz-items-center cvz-p-2 cvz-rounded-xl cvz-border cvz-no-underline cvz-transition-colors ${
+            darkMode
+              ? 'cvz-bg-gray-800 cvz-border-gray-700 cvz-text-gray-100 hover:cvz-bg-gray-700'
+              : 'cvz-bg-white cvz-border-gray-200 cvz-text-gray-800 hover:cvz-bg-gray-50'
+          }`}
+        >
+          {card.imageUrl && (
+            <img
+              src={card.imageUrl}
+              alt=""
+              loading="lazy"
+              className="cvz-w-12 cvz-h-12 cvz-rounded-lg cvz-object-cover cvz-flex-shrink-0"
+            />
+          )}
+          <span className="cvz-flex cvz-flex-col cvz-min-w-0 cvz-text-xs">
+            {sponsored && (
+              <span className={`cvz-uppercase cvz-tracking-wide cvz-font-semibold ${
+                darkMode ? 'cvz-text-gray-400' : 'cvz-text-gray-500'
+              }`}>
+                {sponsoredLabel || DEFAULT_SPONSORED_LABEL}
+              </span>
+            )}
+            <span className="cvz-font-semibold cvz-text-sm cvz-truncate">{card.title}</span>
+            {card.description && (
+              <span className={darkMode ? 'cvz-text-gray-300' : 'cvz-text-gray-600'}>{card.description}</span>
+            )}
+            {card.merchant && (
+              <span className={darkMode ? 'cvz-text-gray-400' : 'cvz-text-gray-500'}>{card.merchant}</span>
+            )}
+          </span>
+        </a>
+      );
+    })}
+  </div>
+);
+
 const ChatMessages = ({
   messages,
   isStreaming,
@@ -208,7 +268,8 @@ const ChatMessages = ({
   messagesEndRef,
   enableMarkdown,
   darkMode,
-  icons
+  icons,
+  sponsoredLabel
 }: {
   messages: ChatMessage[];
   isStreaming: boolean;
@@ -220,6 +281,7 @@ const ChatMessages = ({
   enableMarkdown?: boolean;
   darkMode?: boolean;
   icons?: WidgetIcons;
+  sponsoredLabel?: string;
 }) => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -264,8 +326,8 @@ const ChatMessages = ({
         </div>
       )}
       {messages.map((msg) => (
+        <div key={msg.createdAt.toString()}>
         <div
-          key={msg.createdAt.toString()}
           className={`cvz-flex ${msg.role === 'USER' ? 'cvz-justify-end' : 'cvz-justify-start'}`}
         >
           <div
@@ -281,6 +343,14 @@ const ChatMessages = ({
           >
             <MessageContent content={msg.content} enableMarkdown={enableMarkdown} darkMode={darkMode} />
           </div>
+          </div>
+          {msg.role === 'ASSISTANT' && msg.cards && msg.cards.length > 0 && (
+            <div className="cvz-flex cvz-justify-start">
+              <div className="cvz-max-w-[85%] cvz-w-full">
+                <MessageCards cards={msg.cards} sponsoredLabel={sponsoredLabel} darkMode={darkMode} />
+              </div>
+            </div>
+          )}
         </div>
       ))}
       {isStreaming && streamingMessage && !isFinalizingRef.current && (
@@ -504,6 +574,7 @@ const App = ({ config }: AppProps) => {
           enableMarkdown={config.enableMarkdown}
           darkMode={config.darkMode}
           icons={config.icons}
+          sponsoredLabel={config.sponsoredLabel}
         />
 
         {core.showAuthNudge && !isEndUserAuthValid(core.endUserAuth) && (

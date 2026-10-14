@@ -13,8 +13,10 @@ if (options) {
   };
 }
 import styles from './styles/output.css';
-import { ChatMessage, ChatPersonaIdentifier, TokenResponse, WidgetConfig, WidgetStyle, WidgetIcons } from "@/types";
+import { ChatMessage, ChatPersonaIdentifier, TokenResponse, WidgetConfig, WidgetStyle, WidgetIcons, ChatCard, AssistantMessageEvent } from "@/types";
+import { getMountedStore } from './useChatCoreAdapter';
 export {ChatMessage, ChatPersonaIdentifier};
+export type {ChatCard, AssistantMessageEvent};
 // WidgetConfig/WidgetStyle/WidgetIcons/TokenResponse now live in ./types (see
 // core/chatCore.ts for why) - re-exported here so this stays a
 // backward-compatible import site for existing consumers of the default entry.
@@ -72,7 +74,17 @@ class WidgetManager {
         ({ hostElement: this.hostElement, root: this.root } = mountApp(config, App));
     }
 
-    // ... methods ...
+    // Attaches cards (e.g. product recommendations) to the latest assistant
+    // message - the imperative alternative to returning them from
+    // config.onAssistantMessage. See ChatCard for the shape.
+    addCards(cards: ChatCard[]) {
+        const store = getMountedStore();
+        if (!store) {
+            console.warn('addCards: cvzWidget is not initialized.');
+            return;
+        }
+        store.addCards(cards);
+    }
 
     hide() {
         if (!this.hostElement) {

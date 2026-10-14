@@ -7,5 +7,5 @@
  */
 
 export { useChatCore, type UseChatCoreResult } from './useChatCore';
-export type { WidgetConfig, WidgetStyle, WidgetIcons, TokenResponse, ChatMessage, ChatPersonaIdentifier } from '../types';
+export type { WidgetConfig, WidgetStyle, WidgetIcons, TokenResponse, ChatMessage, ChatPersonaIdentifier, ChatCard, AssistantMessageEvent } from '../types';
 export { getPositionStyles, getDialogSize, getFrameColor, getButtonColors, DIALOG_MAX_WIDTH, DIALOG_MAX_HEIGHT } from '../styleHelpers';

@@ -5,8 +5,8 @@
  * than the ones this package ships adapters for (see ../react/index.ts).
  */
 
-export { createChatCore, type ChatCoreState, type ChatCoreStore } from './chatCore';
-export type { WidgetConfig, WidgetStyle, WidgetIcons, TokenResponse, ChatMessage, ChatPersonaIdentifier } from '../types';
+export { createChatCore, sanitizeCards, type ChatCoreState, type ChatCoreStore } from './chatCore';
+export type { WidgetConfig, WidgetStyle, WidgetIcons, TokenResponse, ChatMessage, ChatPersonaIdentifier, ChatCard, AssistantMessageEvent } from '../types';
 export type { CaptchaMount } from '../clientId';
 export type { EndUserAuth } from '../endUserAuth';
 export { getPositionStyles, getDialogSize, getFrameColor, getButtonColors, DIALOG_MAX_WIDTH, DIALOG_MAX_HEIGHT } from '../styleHelpers';
