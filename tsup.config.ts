@@ -60,6 +60,40 @@ export default defineConfig([
     },
   },
   {
+    // cvz-widget-voice - the voice-enhanced widget. A superset of the default
+    // widget (same text chat over SSE) plus a WebRTC voice turn. Mirrors the
+    // default widget config exactly (self-registers window.cvzVoiceWidget via
+    // src/voice/index.ts), just a different entry + global. Kept a separate
+    // bundle so the lean text widget never ships the WebRTC/audio code.
+    entry: {
+      'cvz-widget-voice': 'src/voice/index.ts',
+    },
+    format: ['iife', 'esm', 'cjs'],
+    outDir: 'dist',
+    outExtension: ({ format }) => ({
+      js: format === 'esm' ? '.mjs' : format === 'cjs' ? '.cjs' : '.js',
+    }),
+    clean: false,
+    minify: true,
+    treeshake: true,
+    bundle: true,
+    dts: true,
+    noExternal: [/(.*)/],
+    platform: 'browser',
+    loader: {
+      '.css': 'text',
+    },
+    define: {
+      __CVZ_BUILD_ID__: JSON.stringify(getBuildId()),
+    },
+    esbuildOptions(options) {
+      options.alias = options.alias || {};
+      options.alias['react'] = 'preact/compat';
+      options.alias['react-dom'] = 'preact/compat';
+      options.alias['react/jsx-runtime'] = 'preact/jsx-runtime';
+    },
+  },
+  {
     // @converzen/chat-widget/core - framework-agnostic, zero runtime
     // dependencies (no preact/react import anywhere in its graph). No react
     // alias here - unlike the default entry above, this one must never

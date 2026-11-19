@@ -52,6 +52,8 @@ export function useChatCoreAdapter(config: WidgetConfig): ChatCoreAdapterResult 
     getTenantAuthToken: store.getTenantAuthToken,
     setCaptchaContainer: store.setCaptchaContainer,
     addCards: store.addCards,
+    startVoice: store.startVoice,
+    stopVoice: store.stopVoice,
     isFinalizingRef: store.isFinalizingRef,
     dispose: store.dispose,
   };

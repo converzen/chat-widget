@@ -1,0 +1,62 @@
+<body>
+  <h1>My Client Site — Voice Widget</h1>
+  <p>
+    Loads the voice-enhanced widget (<code>cvz-widget-voice.js</code>, global
+    <code>window.cvzVoiceWidget</code>). Click the launcher, then the mic button
+    in the input row. Speak; the stage pill shows listening / transcribing /
+    thinking and the assistant's reply lands in the conversation. Typing still
+    works in the same chat. Requires a cvz-chat with voice enabled, served over
+    HTTPS or localhost (getUserMedia needs a secure context).
+  </p>
+  <!-- src="https://converzen.de/widget/latest/cvz-widget-voice.js" -->
+  <script
+          async
+          src="./dist/cvz-widget-voice.js"
+          id="cvz-voice-widget-script"
+  ></script>
+
+  <script>
+      (function() {
+          const script = document.getElementById('cvz-voice-widget-script');
+
+          const initWidget = () => {
+              console.log("initVoiceWidget()");
+              if (window.cvzVoiceWidget) {
+                  window.cvzVoiceWidget.init({
+                      chatUrl: "http://localhost:8002", // your cvz-chat (voice enabled)
+
+                      // Demo mode: direct API key. The widget exchanges it for a
+                      // bearer chat-JWT for the voice route automatically.
+                      apiKey: "sk_test_dwzR2yDj35AGcgHbw9cpaBRgb9qEkvFE",
+                      persona: { "version_tag": "next", "persona_id": 1 },
+
+                      headerMsg: "Talk to an Expert",
+                      initialGreeting: "Hello! Tap the mic and start talking, or type.",
+                      promptPlaceholder: "Type, or tap the mic…",
+                      enableMarkdown: true,
+
+                      // Voice options
+                      voiceButtonLabel: "Talk",
+                      voiceAutoStart: false, // push-to-talk
+
+                      style: {
+                          position: 'bottom-right',
+                          dialogSize: 'large',
+                          frameColor: '#E5E7EB',
+                          buttonColor: { normal: '#2563EB', hover: '#1D4ED8', open: '#1F2937' }
+                      },
+                      onUserMessage: (e) => console.log("User message:", e),
+                      onAssistantMessage: async ({ question, answer }) =>
+                          console.log("Assistant message:", { question, answer }),
+                      onLoadMessages: async () => []
+                  });
+              } else {
+                  console.log("No cvzVoiceWidget");
+              }
+          };
+
+          script.addEventListener('load', initWidget);
+          if (window.cvzVoiceWidget) initWidget();
+      })();
+  </script>
+</body>

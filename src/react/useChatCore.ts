@@ -35,6 +35,9 @@ const SERVER_SNAPSHOT: ChatCoreState = {
   captchaPending: false,
   endUserAuth: null,
   showAuthNudge: false,
+  voiceStatus: 'idle',
+  voiceStage: 'idle',
+  voiceError: null,
 };
 
 export function useChatCore(config: WidgetConfig): UseChatCoreResult {
@@ -56,6 +59,8 @@ export function useChatCore(config: WidgetConfig): UseChatCoreResult {
     getTenantAuthToken: store.getTenantAuthToken,
     setCaptchaContainer: store.setCaptchaContainer,
     addCards: store.addCards,
+    startVoice: store.startVoice,
+    stopVoice: store.stopVoice,
     isFinalizingRef: store.isFinalizingRef,
     dispose: store.dispose,
   };

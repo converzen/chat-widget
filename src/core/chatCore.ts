@@ -12,7 +12,18 @@
  * infinite-loop otherwise.
  */
 
-import type { WidgetConfig, TokenResponse, ChatMessage, ChatCard } from '../types';
+import type {
+  WidgetConfig,
+  TokenResponse,
+  ChatMessage,
+  ChatCard,
+  ChatPersonaIdentifier,
+  VoiceStatus,
+  VoiceStage,
+  VoiceServerEvent,
+  VoiceSessionFactory,
+  VoiceSessionHandle,
+} from '../types';
 import { streamChat } from '../services/streaming';
 import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterRejection, type CaptchaMount } from '../clientId';
 import { createDefaultHistory } from '../history';
@@ -78,6 +89,13 @@ export interface ChatCoreState {
   /** Only meaningful when config.endUserLicensing is set. */
   endUserAuth: EndUserAuth | null;
   showAuthNudge: boolean;
+  /** Voice connection state. Always 'idle' in the text-only build (no voice
+   *  session factory is injected, so startVoice is a no-op). */
+  voiceStatus: VoiceStatus;
+  /** Which turn phase the voice server last reported. */
+  voiceStage: VoiceStage;
+  /** Last voice error, surfaced to the presentation; cleared on each start. */
+  voiceError: string | null;
 }
 
 export interface ChatCoreStore {
@@ -107,6 +125,14 @@ export interface ChatCoreStore {
    *  and persists them - the imperative counterpart to returning cards from
    *  config.onAssistantMessage. Invalid cards are dropped. */
   addCards(cards: ChatCard[]): void;
+  /** Starts a voice session (WebRTC), wiring its transcript/response/error
+   *  events into this same conversation (shared messages + sessionId). No-op
+   *  in the text-only build (no session factory injected). `audioElement` is
+   *  where the inbound remote track is attached - silent until the backend
+   *  grows TTS, but wired now. */
+  startVoice(audioElement: HTMLAudioElement | null): Promise<void>;
+  /** Tears down the active voice session, if any. */
+  stopVoice(): void;
   /** Aborts any in-flight stream and drops pending frame callbacks - call
    *  when the presentation unmounts (e.g. WidgetManager.hide() before a
    *  re-init with a different persona), so a reply still streaming for the
@@ -114,7 +140,15 @@ export interface ChatCoreStore {
   dispose(): void;
 }
 
-export function createChatCore(config: WidgetConfig): ChatCoreStore {
+/** Non-serializable dependencies injected at store-creation time. The voice
+ *  session factory is passed only by the voice build (src/voice/*), so the
+ *  text-only bundle never references any WebRTC code and esbuild drops it. */
+export interface ChatCoreOptions {
+  voiceSessionFactory?: VoiceSessionFactory;
+}
+
+export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = {}): ChatCoreStore {
+  const voiceSessionFactory = options.voiceSessionFactory;
   const listeners = new Set<() => void>();
 
   let captchaContainer: HTMLElement | null = null;
@@ -138,7 +172,12 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
       return isEndUserAuthValid(stored) ? stored : null;
     })(),
     showAuthNudge: false,
+    voiceStatus: 'idle',
+    voiceStage: 'idle',
+    voiceError: null,
   };
+
+  let voiceHandle: VoiceSessionHandle | null = null;
 
   function notify() {
     listeners.forEach((l) => l());
@@ -224,6 +263,154 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
       return { token: state.endUserAuth.token, type: 'bearer' };
     }
     return getTenantAuthToken(forceRefresh);
+  }
+
+  // --- Voice (WebRTC) ---------------------------------------------------
+  // Only wired when a voice session factory was injected (the voice build).
+  // Everything here shares this store's `messages`/`sessionId`, so a spoken
+  // turn and a typed turn land in one conversation.
+
+  function normalizeVoicePersona(): ChatPersonaIdentifier | null {
+    const p = config.persona;
+    if (!p) return null;
+    return typeof p === 'string' ? { alias: p } : p;
+  }
+
+  /** The voice routes require `Authorization: Bearer <chat-jwt>` (never
+   *  X-API-Key). In getToken/secure mode the host-minted JWT already is one;
+   *  in apiKey/demo mode we exchange the API key for a short-lived chat-JWT
+   *  via POST /api/chat/get_token (mirrors cvz-admin's getVoiceToken). */
+  async function getVoiceAuthToken(): Promise<string> {
+    if (!config.apiKey && config.getToken) {
+      const auth = await getTenantAuthToken();
+      return auth.token;
+    }
+    if (!config.apiKey) {
+      throw new Error('Either apiKey or getToken must be provided');
+    }
+    const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
+    const clientId = await getClientId();
+    const res = await fetch(`${baseUrl}/api/chat/get_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': config.apiKey },
+      body: JSON.stringify({
+        user_id: 'voice-widget',
+        media_type: 'voice',
+        client_id: clientId ?? undefined,
+        persona: normalizeVoicePersona(),
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`voice token request failed (${res.status}): ${await res.text()}`);
+    }
+    const data = await res.json();
+    if (!data || typeof data.token !== 'string') {
+      throw new Error('voice token response missing token');
+    }
+    return data.token as string;
+  }
+
+  /** Finalizes a voice assistant turn into the shared conversation - same
+   *  shape/persist/hook path as the `done` case of executeStreaming. */
+  async function commitVoiceResponse(content: string, sid: string): Promise<void> {
+    if (!content) {
+      setState({ voiceStage: 'idle' });
+      return;
+    }
+    isFinalizingRef.current = true;
+    const prevMessages = state.messages;
+    const lastUser = [...prevMessages].reverse().find((m) => m.role === 'USER');
+    const assistantMessage: ChatMessage = {
+      content,
+      role: 'ASSISTANT',
+      createdAt: new Date().toISOString(),
+    };
+    const finalMessages = [...prevMessages, assistantMessage];
+    const nextSid = sid || state.sessionId || '';
+    setState({ messages: finalMessages, sessionId: sid || state.sessionId, voiceStage: 'idle' });
+    setTimeout(() => {
+      isFinalizingRef.current = false;
+    }, 0);
+    await saveMessages(nextSid, finalMessages);
+    runAssistantMessageHook(lastUser?.content ?? '', assistantMessage, nextSid);
+  }
+
+  function handleVoiceEvent(event: VoiceServerEvent): void {
+    switch (event.type) {
+      case 'status':
+        setState({ voiceStage: event.stage });
+        break;
+      case 'input': {
+        // The caller's own transcribed speech. cvz-chat does not emit this
+        // yet (see Voice Pipeline Audit), but when it does the spoken turn
+        // shows as a USER bubble with no further change here.
+        const text = event.text?.trim();
+        if (!text) break;
+        const msgs = [
+          ...state.messages,
+          { content: text, role: 'USER' as const, createdAt: new Date().toISOString() },
+        ];
+        setState({ messages: msgs });
+        void saveMessages(state.sessionId || '', msgs);
+        if (config.onUserMessage) {
+          try {
+            config.onUserMessage({ question: text, sessionId: state.sessionId });
+          } catch (error) {
+            console.error('cvzWidget: onUserMessage failed', error);
+          }
+        }
+        break;
+      }
+      case 'response':
+        void commitVoiceResponse(event.text, event.session_id);
+        break;
+      case 'error': {
+        const msgs = [
+          ...state.messages,
+          { content: event.message || 'Voice error', role: 'SYSTEM' as const, createdAt: new Date().toISOString() },
+        ];
+        setState({ messages: msgs, voiceStage: 'idle' });
+        void saveMessages(state.sessionId || '', msgs);
+        break;
+      }
+    }
+  }
+
+  async function startVoice(audioElement: HTMLAudioElement | null): Promise<void> {
+    if (!voiceSessionFactory) return; // text-only build: no-op
+    if (voiceHandle || state.voiceStatus === 'connecting' || state.voiceStatus === 'connected') return;
+    setState({ voiceStatus: 'connecting', voiceStage: 'idle', voiceError: null });
+    try {
+      const token = await getVoiceAuthToken();
+      const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
+      voiceHandle = await voiceSessionFactory({
+        baseUrl,
+        token,
+        sessionId: state.sessionId,
+        audioElement,
+        callbacks: {
+          onStatusChange: (status) =>
+            setState(status === 'connected' ? { voiceStatus: status } : { voiceStatus: status, voiceStage: 'idle' }),
+          onEvent: handleVoiceEvent,
+          onError: (message) => setState({ voiceError: message }),
+        },
+      });
+    } catch (err) {
+      voiceHandle = null;
+      setState({
+        voiceStatus: 'failed',
+        voiceStage: 'idle',
+        voiceError: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  function stopVoice(): void {
+    if (voiceHandle) {
+      voiceHandle.stop();
+      voiceHandle = null;
+    }
+    setState({ voiceStatus: 'stopped', voiceStage: 'idle' });
   }
 
   async function executeStreaming(
@@ -665,6 +852,10 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
   }
 
   function dispose(): void {
+    if (voiceHandle) {
+      voiceHandle.stop();
+      voiceHandle = null;
+    }
     if (abortController) {
       abortController.abort();
       abortController = null;
@@ -694,6 +885,8 @@ export function createChatCore(config: WidgetConfig): ChatCoreStore {
     getTenantAuthToken,
     setCaptchaContainer,
     addCards,
+    startVoice,
+    stopVoice,
     isFinalizingRef,
     dispose,
   };

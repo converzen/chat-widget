@@ -52,6 +52,60 @@ export interface StreamingData {
   name?: string  // tool_call_started: tool name being called
 }
 
+// --- Voice (cvz-widget-voice build only) ---
+// Mirrors cvz-chat's voice-core: the WebRTC transport at POST
+// /api/voice/webrtc/offer runs Silero VAD -> Groq Whisper STT -> the normal
+// persona/RAG/billing chat pipeline, pushing events over the WebRTC "events"
+// data channel. The text-only widget never imports anything that references
+// these (the WebRTC session factory is injected only by the voice build), so
+// they add no weight to cvz-widget.js.
+
+// High-level connection state of a voice session.
+export type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'failed' | 'stopped'
+
+// Which turn phase the server last reported (maps to voice-core's VoiceStage,
+// plus 'idle' for "between turns / not currently in a turn").
+export type VoiceStage = 'idle' | 'listening' | 'transcribing' | 'thinking'
+
+// Events cvz-chat pushes over the "events" data channel. Mirrors voice-core's
+// VoiceEvent (serde `tag = "type"`, snake_case). `input` carries the caller's
+// own transcribed speech: it is defined by the backend but not emitted yet
+// (see Voice Pipeline Audit), so the widget handles it defensively so a spoken
+// turn renders as a USER bubble the moment the backend starts sending it.
+export type VoiceServerEvent =
+  | { type: 'status'; stage: 'listening' | 'transcribing' | 'thinking' }
+  | { type: 'input'; text: string; emotion?: unknown }
+  | { type: 'response'; text: string; session_id: string }
+  | { type: 'error'; message: string }
+
+export interface VoiceSessionCallbacks {
+  onStatusChange: (status: VoiceStatus) => void
+  onEvent: (event: VoiceServerEvent) => void
+  onError: (message: string) => void
+  onLog?: (message: string) => void
+}
+
+export interface VoiceSessionStartParams {
+  baseUrl: string
+  // A bearer chat-JWT - the voice routes require `Authorization: Bearer`,
+  // never X-API-Key (see getVoiceAuthToken in core/chatCore.ts).
+  token: string
+  sessionId?: string | null
+  // The <audio> element the inbound remote track is attached to. Silent until
+  // the backend grows TTS, but wired now so spoken replies "just work" later.
+  audioElement?: HTMLAudioElement | null
+  callbacks: VoiceSessionCallbacks
+}
+
+export interface VoiceSessionHandle {
+  stop(): void
+}
+
+// Injected into createChatCore by the voice build only (src/voice/*), so the
+// text-only bundle never pulls in any WebRTC/getUserMedia code - esbuild
+// tree-shakes it out when no factory is passed.
+export type VoiceSessionFactory = (params: VoiceSessionStartParams) => Promise<VoiceSessionHandle>
+
 // --- WidgetConfig and friends ---
 // Moved here (out of index.ts) so core/chatCore.ts and the framework
 // adapters can import these types without pulling in index.ts's side
@@ -180,6 +234,12 @@ export interface WidgetConfig {
   onAssistantMessage?: (event: AssistantMessageEvent) => ChatCard[] | void | Promise<ChatCard[] | void>;
   // Label shown on every sponsored card (default "Anzeige").
   sponsoredLabel?: string;
+  // --- Voice build (cvz-widget-voice) only; ignored by the text widget. ---
+  // Tooltip/accessible label for the microphone control (default "Talk").
+  voiceButtonLabel?: string;
+  // Start a voice session automatically as soon as the panel is opened,
+  // instead of waiting for a mic-button press. Default false (push-to-talk).
+  voiceAutoStart?: boolean;
 }
 
 export interface ChatModalConfig {

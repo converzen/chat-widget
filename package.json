@@ -17,6 +17,17 @@
       },
       "default": "./dist/cvz-widget.js"
     },
+    "./voice": {
+      "import": {
+        "types": "./dist/cvz-widget-voice.d.mts",
+        "default": "./dist/cvz-widget-voice.mjs"
+      },
+      "require": {
+        "types": "./dist/cvz-widget-voice.d.ts",
+        "default": "./dist/cvz-widget-voice.cjs"
+      },
+      "default": "./dist/cvz-widget-voice.js"
+    },
     "./core": {
       "import": {
         "types": "./dist/core.d.mts",
