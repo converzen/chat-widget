@@ -6,6 +6,9 @@ export interface ChatMessage {
   // Cards a host attached to this (assistant) message via onAssistantMessage
   // or cvzWidget.addCards() - rendered below the message bubble.
   cards?: ChatCard[]
+  // Voice: the spoken reply was cut off (the caller talked over it, said a
+  // stop command or typed). The text is complete; only part was heard.
+  interrupted?: boolean
 }
 
 // A link card shown below an assistant message - e.g. a product
@@ -65,18 +68,34 @@ export type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'failed' | 'stop
 
 // Which turn phase the server last reported (maps to voice-core's VoiceStage,
 // plus 'idle' for "between turns / not currently in a turn").
-export type VoiceStage = 'idle' | 'listening' | 'transcribing' | 'thinking'
+export type VoiceStage = 'idle' | 'listening' | 'transcribing' | 'thinking' | 'speaking'
 
 // Events cvz-chat pushes over the "events" data channel. Mirrors voice-core's
 // VoiceEvent (serde `tag = "type"`, snake_case). `input` carries the caller's
-// own transcribed speech: it is defined by the backend but not emitted yet
-// (see Voice Pipeline Audit), so the widget handles it defensively so a spoken
-// turn renders as a USER bubble the moment the backend starts sending it.
+// own transcribed speech (rendered as a USER bubble).
+//
+// Barge-in: `duck` / `unduck` / `interrupted` report what the server did to
+// the spoken reply. Over WebRTC the server applies volume and flushing to
+// the audio track itself, so these are informational here. `tts_state`
+// says whether replies are spoken (sent at session start, and after every
+// `set_tts`; `false` for personas without a TTS handler).
 export type VoiceServerEvent =
-  | { type: 'status'; stage: 'listening' | 'transcribing' | 'thinking' }
+  | { type: 'status'; stage: 'listening' | 'transcribing' | 'thinking' | 'speaking' }
   | { type: 'input'; text: string; emotion?: unknown }
   | { type: 'response'; text: string; session_id: string }
   | { type: 'error'; message: string }
+  | { type: 'duck'; gain: number }
+  | { type: 'unduck' }
+  | { type: 'interrupted' }
+  | { type: 'tts_state'; enabled: boolean }
+
+// Messages the widget sends on the "events" data channel (voice-core's
+// ControlMessage). `text_input` makes a typed message a turn of the voice
+// session: same chat session, spoken reply, and it interrupts a reply in
+// progress like talking would. `set_tts` is the per-session mute switch.
+export type VoiceClientMessage =
+  | { type: 'text_input'; text: string }
+  | { type: 'set_tts'; enabled: boolean }
 
 export interface VoiceSessionCallbacks {
   onStatusChange: (status: VoiceStatus) => void
@@ -94,11 +113,16 @@ export interface VoiceSessionStartParams {
   // The <audio> element the inbound remote track is attached to. Silent until
   // the backend grows TTS, but wired now so spoken replies "just work" later.
   audioElement?: HTMLAudioElement | null
+  // Speak replies (true) or text only (false); unset = the persona's default.
+  tts?: boolean | null
   callbacks: VoiceSessionCallbacks
 }
 
 export interface VoiceSessionHandle {
   stop(): void
+  // Send a control message; false when the data channel is not open (yet),
+  // so the caller can fall back.
+  send(message: VoiceClientMessage): boolean
 }
 
 // Injected into createChatCore by the voice build only (src/voice/*), so the
@@ -240,6 +264,9 @@ export interface WidgetConfig {
   // Start a voice session automatically as soon as the panel is opened,
   // instead of waiting for a mic-button press. Default false (push-to-talk).
   voiceAutoStart?: boolean;
+  // Note shown under a spoken reply that was cut off by the caller
+  // (default "Interrupted").
+  voiceInterruptedLabel?: string;
 }
 
 export interface ChatModalConfig {

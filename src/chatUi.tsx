@@ -278,7 +278,8 @@ const ChatMessages = ({
   enableMarkdown,
   darkMode,
   icons,
-  sponsoredLabel
+  sponsoredLabel,
+  interruptedLabel
 }: {
   messages: ChatMessage[];
   isStreaming: boolean;
@@ -291,6 +292,7 @@ const ChatMessages = ({
   darkMode?: boolean;
   icons?: WidgetIcons;
   sponsoredLabel?: string;
+  interruptedLabel?: string;
 }) => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -353,6 +355,14 @@ const ChatMessages = ({
             <MessageContent content={msg.content} enableMarkdown={enableMarkdown} darkMode={darkMode} />
           </div>
           </div>
+          {msg.role === 'ASSISTANT' && msg.interrupted && (
+            <div
+              className={`cvz-mt-1 cvz-ml-1 cvz-text-[11px] cvz-italic ${darkMode ? 'cvz-text-gray-500' : 'cvz-text-gray-400'}`}
+              data-cvz-interrupted
+            >
+              {interruptedLabel || 'Interrupted'}
+            </div>
+          )}
           {msg.role === 'ASSISTANT' && msg.cards && msg.cards.length > 0 && (
             <div className="cvz-flex cvz-justify-start">
               <div className="cvz-max-w-[85%] cvz-w-full">
@@ -604,6 +614,7 @@ export const ChatShell = ({ config, core, headerAccessory, inputAccessory, foote
           darkMode={config.darkMode}
           icons={config.icons}
           sponsoredLabel={config.sponsoredLabel}
+          interruptedLabel={config.voiceInterruptedLabel}
         />
 
         {core.showAuthNudge && !isEndUserAuthValid(core.endUserAuth) && (

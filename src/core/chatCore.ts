@@ -96,6 +96,9 @@ export interface ChatCoreState {
   voiceStage: VoiceStage;
   /** Last voice error, surfaced to the presentation; cleared on each start. */
   voiceError: string | null;
+  /** Whether the voice session speaks its replies, as the server last
+   *  reported (`tts_state`); null while no session is connected. */
+  voiceTts: boolean | null;
 }
 
 export interface ChatCoreStore {
@@ -128,11 +131,13 @@ export interface ChatCoreStore {
   /** Starts a voice session (WebRTC), wiring its transcript/response/error
    *  events into this same conversation (shared messages + sessionId). No-op
    *  in the text-only build (no session factory injected). `audioElement` is
-   *  where the inbound remote track is attached - silent until the backend
-   *  grows TTS, but wired now. */
+   *  where the inbound remote track (the spoken replies) is attached. */
   startVoice(audioElement: HTMLAudioElement | null): Promise<void>;
   /** Tears down the active voice session, if any. */
   stopVoice(): void;
+  /** Mute / unmute spoken replies. Applies to the running voice session
+   *  (cutting off a reply being spoken) and is remembered for the next one. */
+  setVoiceTts(enabled: boolean): void;
   /** Aborts any in-flight stream and drops pending frame callbacks - call
    *  when the presentation unmounts (e.g. WidgetManager.hide() before a
    *  re-init with a different persona), so a reply still streaming for the
@@ -175,9 +180,16 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
     voiceStatus: 'idle',
     voiceStage: 'idle',
     voiceError: null,
+    voiceTts: null,
   };
 
   let voiceHandle: VoiceSessionHandle | null = null;
+  // The caller's mute choice, sent with the next session's offer (null =
+  // persona default).
+  let voiceTtsPref: boolean | null = null;
+  // The server cut off the spoken reply in progress; its `response` (which
+  // still arrives, complete) is marked as interrupted.
+  let replyInterrupted = false;
 
   function notify() {
     listeners.forEach((l) => l());
@@ -313,6 +325,8 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
   /** Finalizes a voice assistant turn into the shared conversation - same
    *  shape/persist/hook path as the `done` case of executeStreaming. */
   async function commitVoiceResponse(content: string, sid: string): Promise<void> {
+    const interrupted = replyInterrupted;
+    replyInterrupted = false;
     if (!content) {
       setState({ voiceStage: 'idle' });
       return;
@@ -324,6 +338,7 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
       content,
       role: 'ASSISTANT',
       createdAt: new Date().toISOString(),
+      ...(interrupted ? { interrupted: true } : {}),
     };
     const finalMessages = [...prevMessages, assistantMessage];
     const nextSid = sid || state.sessionId || '';
@@ -341,9 +356,9 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
         setState({ voiceStage: event.stage });
         break;
       case 'input': {
-        // The caller's own transcribed speech. cvz-chat does not emit this
-        // yet (see Voice Pipeline Audit), but when it does the spoken turn
-        // shows as a USER bubble with no further change here.
+        // The caller's own transcribed speech, shown as a USER bubble.
+        // (Typed turns sent over the voice session get no `input` echo -
+        // sendMessage already added them.)
         const text = event.text?.trim();
         if (!text) break;
         const msgs = [
@@ -364,7 +379,18 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
       case 'response':
         void commitVoiceResponse(event.text, event.session_id);
         break;
+      case 'interrupted':
+        replyInterrupted = true;
+        break;
+      case 'tts_state':
+        setState({ voiceTts: event.enabled });
+        break;
+      case 'duck':
+      case 'unduck':
+        // WebRTC: the server lowers / restores the reply's volume itself.
+        break;
       case 'error': {
+        replyInterrupted = false;
         const msgs = [
           ...state.messages,
           { content: event.message || 'Voice error', role: 'SYSTEM' as const, createdAt: new Date().toISOString() },
@@ -379,7 +405,8 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
   async function startVoice(audioElement: HTMLAudioElement | null): Promise<void> {
     if (!voiceSessionFactory) return; // text-only build: no-op
     if (voiceHandle || state.voiceStatus === 'connecting' || state.voiceStatus === 'connected') return;
-    setState({ voiceStatus: 'connecting', voiceStage: 'idle', voiceError: null });
+    setState({ voiceStatus: 'connecting', voiceStage: 'idle', voiceError: null, voiceTts: null });
+    replyInterrupted = false;
     try {
       const token = await getVoiceAuthToken();
       const baseUrl = config.chatUrl || DEFAULT_CHAT_API_URL;
@@ -388,6 +415,7 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
         token,
         sessionId: state.sessionId,
         audioElement,
+        tts: voiceTtsPref,
         callbacks: {
           onStatusChange: (status) =>
             setState(status === 'connected' ? { voiceStatus: status } : { voiceStatus: status, voiceStage: 'idle' }),
@@ -410,7 +438,41 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
       voiceHandle.stop();
       voiceHandle = null;
     }
-    setState({ voiceStatus: 'stopped', voiceStage: 'idle' });
+    setState({ voiceStatus: 'stopped', voiceStage: 'idle', voiceTts: null });
+  }
+
+  function setVoiceTts(enabled: boolean): void {
+    voiceTtsPref = enabled;
+    if (voiceHandle?.send({ type: 'set_tts', enabled })) {
+      // optimistic; the server's `tts_state` answer is authoritative (it
+      // stays false for a persona without a TTS handler)
+      setState({ voiceTts: enabled });
+    }
+  }
+
+  /** A typed message while a voice session is connected goes over the
+   *  session itself: it interrupts a reply being spoken (like talking
+   *  would), gets a spoken answer, and is ordered with the spoken turns in
+   *  the same chat session - no concurrent SSE turn racing a voice turn.
+   *  Returns false when the data channel is not usable (caller falls back
+   *  to SSE). */
+  function sendTypedOverVoice(text: string): boolean {
+    if (state.voiceStatus !== 'connected' || !voiceHandle) return false;
+    if (!voiceHandle.send({ type: 'text_input', text })) return false;
+    if (config.onUserMessage) {
+      try {
+        config.onUserMessage({ question: text, sessionId: state.sessionId });
+      } catch (error) {
+        console.error('cvzWidget: onUserMessage failed', error);
+      }
+    }
+    const msgs = [
+      ...state.messages,
+      { content: text, role: 'USER' as const, createdAt: new Date().toISOString() },
+    ];
+    setState({ messages: msgs, voiceStage: 'thinking' });
+    void saveMessages(state.sessionId || '', msgs);
+    return true;
   }
 
   async function executeStreaming(
@@ -686,6 +748,7 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
 
   async function sendMessage(text: string): Promise<void> {
     if (!text.trim() || state.isStreaming) return;
+    if (sendTypedOverVoice(text.trim())) return;
 
     if (abortController) {
       abortController.abort();
@@ -887,6 +950,7 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
     addCards,
     startVoice,
     stopVoice,
+    setVoiceTts,
     isFinalizingRef,
     dispose,
   };

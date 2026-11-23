@@ -7,14 +7,15 @@
  *
  * Flow: getUserMedia -> RTCPeerConnection -> createDataChannel('events') ->
  * createOffer -> POST offer -> setRemoteDescription(answer). The server pushes
- * status/input/response/error JSON on the data channel, and (once the backend
- * grows TTS) audio on the remote track attached to `audioElement`.
+ * status/input/response/error and barge-in JSON on the data channel and the
+ * spoken replies on the remote track attached to `audioElement`; the widget
+ * sends text_input / set_tts control messages back on the same channel.
  */
 
-import type { VoiceServerEvent, VoiceSessionHandle, VoiceSessionStartParams } from '../types';
+import type { VoiceClientMessage, VoiceServerEvent, VoiceSessionHandle, VoiceSessionStartParams } from '../types';
 
 export async function createVoiceSession(params: VoiceSessionStartParams): Promise<VoiceSessionHandle> {
-  const { baseUrl, token, sessionId, audioElement, callbacks } = params;
+  const { baseUrl, token, sessionId, audioElement, tts, callbacks } = params;
   const log = (m: string) => callbacks.onLog?.(m);
 
   // Ask for the mic first - a denial here should fail before we open any
@@ -46,7 +47,7 @@ export async function createVoiceSession(params: VoiceSessionStartParams): Promi
     }
   };
 
-  // Remote audio from the server (silent until TTS exists, but wired now).
+  // Remote audio from the server: the spoken replies.
   pc.ontrack = (e) => {
     log('remote audio track received');
     if (audioElement) audioElement.srcObject = e.streams[0];
@@ -78,7 +79,9 @@ export async function createVoiceSession(params: VoiceSessionStartParams): Promi
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ sdp: offer.sdp, session_id: sid }),
+    body: JSON.stringify(
+      typeof tts === 'boolean' ? { sdp: offer.sdp, session_id: sid, tts } : { sdp: offer.sdp, session_id: sid },
+    ),
   });
 
   if (!resp.ok) {
@@ -90,5 +93,16 @@ export async function createVoiceSession(params: VoiceSessionStartParams): Promi
   await pc.setRemoteDescription({ type: 'answer', sdp: answer.sdp });
   log('remote description set - ICE checks starting');
 
-  return { stop };
+  const send = (message: VoiceClientMessage): boolean => {
+    if (stopped || events.readyState !== 'open') return false;
+    try {
+      events.send(JSON.stringify(message));
+      return true;
+    } catch (err) {
+      log(`data-channel send failed: ${String(err)}`);
+      return false;
+    }
+  };
+
+  return { stop, send };
 }

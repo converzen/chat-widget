@@ -50,6 +50,7 @@ export function useVoiceChatCore(config: WidgetConfig): ChatCoreAdapterResult {
     addCards: store.addCards,
     startVoice: store.startVoice,
     stopVoice: store.stopVoice,
+    setVoiceTts: store.setVoiceTts,
     isFinalizingRef: store.isFinalizingRef,
     dispose: store.dispose,
   };

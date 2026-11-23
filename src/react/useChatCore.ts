@@ -38,6 +38,7 @@ const SERVER_SNAPSHOT: ChatCoreState = {
   voiceStatus: 'idle',
   voiceStage: 'idle',
   voiceError: null,
+  voiceTts: null,
 };
 
 export function useChatCore(config: WidgetConfig): UseChatCoreResult {
@@ -61,6 +62,7 @@ export function useChatCore(config: WidgetConfig): UseChatCoreResult {
     addCards: store.addCards,
     startVoice: store.startVoice,
     stopVoice: store.stopVoice,
+    setVoiceTts: store.setVoiceTts,
     isFinalizingRef: store.isFinalizingRef,
     dispose: store.dispose,
   };

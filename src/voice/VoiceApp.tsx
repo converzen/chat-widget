@@ -2,13 +2,14 @@ import { useEffect, useRef } from 'preact/hooks';
 import type { WidgetConfig } from '../types';
 import { ChatShell } from '../chatUi';
 import { useVoiceChatCore } from './useVoiceChatCore';
-import { MicButton, VoiceStagePill } from './VoiceControls';
+import { MicButton, SpeakerToggle, VoiceStagePill } from './VoiceControls';
 
 // --- Voice widget ---
 // The exact same ChatShell as the text widget, driven by a voice-enabled
 // adapter, plus a mic button, a stage pill, and the hidden <audio> the
-// inbound remote track plays through. Typed chat still flows over SSE; voice
-// turns flow over WebRTC; both share one conversation (see core/chatCore.ts).
+// inbound remote track plays through. While a voice session is connected,
+// typed messages go over it too (spoken answer, interrupts a reply); without
+// one they flow over SSE. Both share one conversation (see core/chatCore.ts).
 
 interface VoiceAppProps {
   config: WidgetConfig;
@@ -42,7 +43,16 @@ const VoiceApp = ({ config }: VoiceAppProps) => {
       config={config}
       core={core}
       headerAccessory={
-        <VoiceStagePill status={core.voiceStatus} stage={core.voiceStage} darkMode={config.darkMode} />
+        <span className="cvz-flex cvz-items-center cvz-gap-1">
+          <VoiceStagePill status={core.voiceStatus} stage={core.voiceStage} darkMode={config.darkMode} />
+          {core.voiceStatus === 'connected' && core.voiceTts !== null && (
+            <SpeakerToggle
+              enabled={core.voiceTts}
+              onToggle={() => core.setVoiceTts(!core.voiceTts)}
+              darkMode={config.darkMode}
+            />
+          )}
+        </span>
       }
       inputAccessory={
         <MicButton
