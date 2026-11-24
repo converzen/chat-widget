@@ -100,6 +100,10 @@ export interface ChatCoreState {
   /** Whether the voice session speaks its replies, as the server last
    *  reported (`tts_state`); null while no session is connected. */
   voiceTts: boolean | null;
+  /** The visitor's own speech choice (the speaker toggle), sent with the
+   *  next session's offer and kept across sessions; null = persona default.
+   *  State (not a local) so the toggle can show it while no session runs. */
+  voiceTtsPref: boolean | null;
 }
 
 export interface ChatCoreStore {
@@ -182,12 +186,10 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
     voiceStage: 'idle',
     voiceError: null,
     voiceTts: null,
+    voiceTtsPref: null,
   };
 
   let voiceHandle: VoiceSessionHandle | null = null;
-  // The caller's mute choice, sent with the next session's offer (null =
-  // persona default).
-  let voiceTtsPref: boolean | null = null;
   // The server cut off the spoken reply in progress; its `response` (which
   // still arrives, complete) is marked as interrupted.
   let replyInterrupted = false;
@@ -419,7 +421,7 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
         token,
         sessionId: state.sessionId,
         audioElement,
-        tts: voiceTtsPref,
+        tts: state.voiceTtsPref,
         callbacks: {
           onStatusChange: (status) =>
             setState(status === 'connected' ? { voiceStatus: status } : { voiceStatus: status, voiceStage: 'idle' }),
@@ -456,12 +458,16 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
     setState({ voiceStatus: 'stopped', voiceStage: 'idle', voiceTts: null });
   }
 
+  /** The speaker toggle. Without a session it only records the choice (the
+   *  next session starts with it, so a muted visitor's first reply isn't
+   *  synthesized at all); with one it also switches the running session. */
   function setVoiceTts(enabled: boolean): void {
-    voiceTtsPref = enabled;
     if (voiceHandle?.send({ type: 'set_tts', enabled })) {
       // optimistic; the server's `tts_state` answer is authoritative (it
       // stays false for a persona without a TTS handler)
-      setState({ voiceTts: enabled });
+      setState({ voiceTtsPref: enabled, voiceTts: enabled });
+    } else {
+      setState({ voiceTtsPref: enabled });
     }
   }
 

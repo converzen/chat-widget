@@ -267,6 +267,11 @@ export interface WidgetConfig {
   // Note shown under a spoken reply that was cut off by the caller
   // (default "Interrupted").
   voiceInterruptedLabel?: string;
+  // Tooltip/accessible labels of the speaker toggle next to the mic button:
+  // while replies are spoken (default "Mute spoken replies") and while they
+  // are muted (default "Speak replies").
+  voiceMuteLabel?: string;
+  voiceUnmuteLabel?: string;
 }
 
 export interface ChatModalConfig {
