@@ -39,6 +39,7 @@ const SERVER_SNAPSHOT: ChatCoreState = {
   voiceStage: 'idle',
   voiceError: null,
   voiceTts: null,
+  voiceTtsPref: null,
 };
 
 export function useChatCore(config: WidgetConfig): UseChatCoreResult {

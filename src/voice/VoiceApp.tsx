@@ -6,7 +6,8 @@ import { MicButton, SpeakerToggle, VoiceStagePill } from './VoiceControls';
 
 // --- Voice widget ---
 // The exact same ChatShell as the text widget, driven by a voice-enabled
-// adapter, plus a mic button, a stage pill, and the hidden <audio> the
+// adapter, plus a mic button and speaker toggle (left of the text field),
+// a stage pill (header), and the hidden <audio> the
 // inbound remote track plays through. While a voice session is connected,
 // typed messages go over it too (spoken answer, interrupts a reply); without
 // one they flow over SSE. Both share one conversation (see core/chatCore.ts).
@@ -20,6 +21,10 @@ const VoiceApp = ({ config }: VoiceAppProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const active = core.voiceStatus === 'connecting' || core.voiceStatus === 'connected';
+  // Spoken replies: what the running session reports, else the visitor's
+  // choice for the next one (unset = on, the persona default for voice).
+  const speaking =
+    core.voiceStatus === 'connected' && core.voiceTts !== null ? core.voiceTts : (core.voiceTtsPref ?? true);
 
   const toggleVoice = () => {
     if (active) core.stopVoice();
@@ -43,30 +48,31 @@ const VoiceApp = ({ config }: VoiceAppProps) => {
       config={config}
       core={core}
       headerAccessory={
-        <span className="cvz-flex cvz-items-center cvz-gap-1">
-          <VoiceStagePill
-            status={core.voiceStatus}
-            stage={core.voiceStage}
-            darkMode={config.darkMode}
-            error={core.voiceError}
-          />
-          {core.voiceStatus === 'connected' && core.voiceTts !== null && (
-            <SpeakerToggle
-              enabled={core.voiceTts}
-              onToggle={() => core.setVoiceTts(!core.voiceTts)}
-              darkMode={config.darkMode}
-            />
-          )}
-        </span>
+        <VoiceStagePill
+          status={core.voiceStatus}
+          stage={core.voiceStage}
+          darkMode={config.darkMode}
+          error={core.voiceError}
+        />
       }
       inputAccessory={
-        <MicButton
-          active={active}
-          connecting={core.voiceStatus === 'connecting'}
-          onClick={toggleVoice}
-          label={config.voiceButtonLabel}
-          darkMode={config.darkMode}
-        />
+        <>
+          <MicButton
+            active={active}
+            connecting={core.voiceStatus === 'connecting'}
+            onClick={toggleVoice}
+            label={config.voiceButtonLabel}
+            darkMode={config.darkMode}
+          />
+          <SpeakerToggle
+            enabled={speaking}
+            onToggle={() => core.setVoiceTts(!speaking)}
+            disabled={core.voiceStatus === 'connecting'}
+            muteLabel={config.voiceMuteLabel}
+            unmuteLabel={config.voiceUnmuteLabel}
+            darkMode={config.darkMode}
+          />
+        </>
       }
       footer={<audio ref={audioRef} autoPlay style={{ display: 'none' }} />}
     />
