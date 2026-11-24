@@ -27,6 +27,7 @@ import type {
 import { streamChat } from '../services/streaming';
 import { getOrCreateClientId, isInvalidClientIdError, refreshClientIdAfterRejection, type CaptchaMount } from '../clientId';
 import { createDefaultHistory } from '../history';
+import { rejectedResponse, toVoiceStartError, VOICE_TEXT } from './voiceErrors';
 import {
   clearEndUserAuth,
   isEndUserAuthValid,
@@ -313,7 +314,7 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
       }),
     });
     if (!res.ok) {
-      throw new Error(`voice token request failed (${res.status}): ${await res.text()}`);
+      throw await rejectedResponse(res, 'voice token request');
     }
     const data = await res.json();
     if (!data || typeof data.token !== 'string') {
@@ -391,15 +392,18 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
         break;
       case 'error': {
         replyInterrupted = false;
-        const msgs = [
-          ...state.messages,
-          { content: event.message || 'Voice error', role: 'SYSTEM' as const, createdAt: new Date().toISOString() },
-        ];
-        setState({ messages: msgs, voiceStage: 'idle' });
-        void saveMessages(state.sessionId || '', msgs);
+        addSystemMessage(event.message || 'Voice error', { voiceStage: 'idle' });
         break;
       }
     }
+  }
+
+  /** A SYSTEM bubble in the conversation (kept in history) - how voice
+   *  errors reach the visitor, same as text chat's errors. */
+  function addSystemMessage(content: string, extra: Partial<ChatCoreState> = {}): void {
+    const msgs = [...state.messages, { content, role: 'SYSTEM' as const, createdAt: new Date().toISOString() }];
+    setState({ ...extra, messages: msgs });
+    void saveMessages(state.sessionId || '', msgs);
   }
 
   async function startVoice(audioElement: HTMLAudioElement | null): Promise<void> {
@@ -420,16 +424,27 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
           onStatusChange: (status) =>
             setState(status === 'connected' ? { voiceStatus: status } : { voiceStatus: status, voiceStage: 'idle' }),
           onEvent: handleVoiceEvent,
-          onError: (message) => setState({ voiceError: message }),
+          onError: (message) => {
+            // ICE failed/disconnected: the session is dead. Release it, or
+            // startVoice would refuse to open a new one (voiceHandle set).
+            console.warn('cvzVoiceWidget: voice connection failed:', message);
+            voiceHandle?.stop();
+            voiceHandle = null;
+            addSystemMessage(VOICE_TEXT.connection_lost, { voiceError: VOICE_TEXT.connection_lost });
+          },
         },
       });
     } catch (err) {
       voiceHandle = null;
-      setState({
-        voiceStatus: 'failed',
-        voiceStage: 'idle',
-        voiceError: err instanceof Error ? err.message : String(err),
-      });
+      const failure = toVoiceStartError(err);
+      console.warn('cvzVoiceWidget: voice could not start:', failure.message);
+      const failed = { voiceStatus: 'failed' as const, voiceStage: 'idle' as const, voiceError: failure.userMessage };
+      if (failure.kind === 'rate_limited' && config.endUserLicensing) {
+        // same as text chat: offer authenticating instead of a dead end
+        setState({ ...failed, showAuthNudge: true });
+        return;
+      }
+      addSystemMessage(failure.userMessage, failed);
     }
   }
 
