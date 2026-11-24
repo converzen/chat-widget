@@ -12,6 +12,7 @@
  * sends text_input / set_tts control messages back on the same channel.
  */
 
+import { micError, rejectedResponse } from '../core/voiceErrors';
 import type { VoiceClientMessage, VoiceServerEvent, VoiceSessionHandle, VoiceSessionStartParams } from '../types';
 
 export async function createVoiceSession(params: VoiceSessionStartParams): Promise<VoiceSessionHandle> {
@@ -20,7 +21,12 @@ export async function createVoiceSession(params: VoiceSessionStartParams): Promi
 
   // Ask for the mic first - a denial here should fail before we open any
   // peer connection or hit the server.
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    throw micError(err);
+  }
 
   // A public STUN server for local candidate gathering. The server returns
   // its own ICE server list in the offer response, but that arrives after the
@@ -86,7 +92,8 @@ export async function createVoiceSession(params: VoiceSessionStartParams): Promi
 
   if (!resp.ok) {
     stop();
-    throw new Error(`voice offer rejected (${resp.status}): ${await resp.text()}`);
+    // 429 = the visitor's usage limit: its body is the message to show.
+    throw await rejectedResponse(resp, 'voice offer');
   }
 
   const answer = (await resp.json()) as { sdp: string };

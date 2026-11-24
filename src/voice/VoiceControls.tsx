@@ -96,10 +96,13 @@ export const VoiceStagePill = ({
   status,
   stage,
   darkMode,
+  error,
 }: {
   status: VoiceStatus;
   stage: VoiceStage;
   darkMode?: boolean;
+  /** Why voice failed (also shown as a chat message) - the pill's tooltip. */
+  error?: string | null;
 }) => {
   let text: string;
   if (status === 'connecting') text = 'Connecting';
@@ -109,6 +112,7 @@ export const VoiceStagePill = ({
 
   return (
     <span
+      title={status === 'failed' && error ? error : undefined}
       className={`cvz-rounded-full cvz-px-2.5 cvz-py-1 cvz-text-[11px] cvz-font-medium cvz-whitespace-nowrap ${
         status === 'failed'
           ? 'cvz-bg-red-500/20 cvz-text-red-100'

@@ -44,7 +44,12 @@ const VoiceApp = ({ config }: VoiceAppProps) => {
       core={core}
       headerAccessory={
         <span className="cvz-flex cvz-items-center cvz-gap-1">
-          <VoiceStagePill status={core.voiceStatus} stage={core.voiceStage} darkMode={config.darkMode} />
+          <VoiceStagePill
+            status={core.voiceStatus}
+            stage={core.voiceStage}
+            darkMode={config.darkMode}
+            error={core.voiceError}
+          />
           {core.voiceStatus === 'connected' && core.voiceTts !== null && (
             <SpeakerToggle
               enabled={core.voiceTts}
