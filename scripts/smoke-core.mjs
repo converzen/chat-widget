@@ -208,6 +208,39 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
   assert(!core.getState().messages.some((m) => m.cards), 'cards: arriving after clearHistory() are dropped');
   core.dispose();
 }
+
+{
+  // A restored sessionId the server no longer has (purged / version deleted):
+  // the continuation answers session_expired, the widget retries once as a
+  // new conversation and adopts the new session.
+  const calls = [];
+  const fresh = sseFetch('Neu');
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), body: JSON.parse(init.body) });
+    if (String(url).includes('/continuation/')) {
+      const body = `data: ${JSON.stringify({ type: 'error', code: 'session_expired', message: 'Your session has expired' })}\n\n`;
+      return new Response(new ReadableStream({
+        start(c) { c.enqueue(new TextEncoder().encode(body)); c.close(); },
+      }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    }
+    return fresh();
+  };
+  const saved = [];
+  const core = createChatCore({
+    chatUrl: 'http://chat.test',
+    getToken: async () => 'x',
+    onSaveMessages: async (sessionId) => { saved.push(sessionId); },
+    onLoadMessages: async () => ({ sessionId: 'stale-sess', messages: [] }),
+  });
+  await settle();
+  await core.sendMessage('Frage');
+  await settle();
+  const st = core.getState();
+  assert(calls.length === 2 && calls[0].url.includes('/continuation/') && calls[1].url.includes('/completion/') && calls[1].body.session === undefined, 'session_expired: retried once as a new conversation');
+  assert(st.sessionId === 'sess-1' && saved.at(-1) === 'sess-1', 'session_expired: the new session replaces the stale one');
+  assert(st.messages.some((m) => m.role === 'ASSISTANT' && m.content === 'Neu') && !st.messages.some((m) => m.content.includes('expired')), 'session_expired: answered, no error shown');
+  core.dispose();
+}
 globalThis.fetch = realFetch;
 
 console.log(failures === 0 ? '\nAll smoke checks passed.' : `\n${failures} smoke check(s) FAILED.`);

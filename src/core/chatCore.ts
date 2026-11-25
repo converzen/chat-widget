@@ -522,6 +522,7 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
 
       let accumulatedContent = '';
       let hasUnauthorizedError = false;
+      let hasSessionExpired = false;
       let hasFillerContent = false;
       // See App.tsx's original comment: multiple SSE events parsed from the
       // same network chunk can otherwise overwrite each other's filler text
@@ -668,6 +669,17 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
               break;
             }
 
+            if (errorCode === 'session_expired' && currentSessionId && retryCount < maxRetries) {
+              // cvz-chat no longer has this conversation (purged after its
+              // retention period, or deleted with its persona version).
+              // Continue as a new conversation: telling the visitor to
+              // reload would restore the same stale sessionId from storage
+              // and fail again.
+              setState({ sessionId: null });
+              hasSessionExpired = true;
+              break;
+            }
+
             if (errorCode === 'rate_limited' && config.endUserLicensing) {
               setState({
                 showAuthNudge: true,
@@ -704,11 +716,11 @@ export function createChatCore(config: WidgetConfig, options: ChatCoreOptions = 
         }
       }
 
-      if (hasUnauthorizedError && retryCount < maxRetries) {
+      if ((hasUnauthorizedError || hasSessionExpired) && retryCount < maxRetries) {
         return executeStreaming(userMessage, updatedMessages, controller, retryCount + 1);
       }
 
-      if (!controller.signal.aborted && !hasUnauthorizedError) {
+      if (!controller.signal.aborted && !hasUnauthorizedError && !hasSessionExpired) {
         setState({
           streamingMessage: '',
           thinkingMessage: '',
